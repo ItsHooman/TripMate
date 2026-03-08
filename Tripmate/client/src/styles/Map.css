@@ -1,0 +1,8 @@
+.map-container {
+    width: 100%; /* Full width */
+    height: 300px; /* Fixed height */
+    border-radius: 10px; /* Rounded corners */
+    overflow: hidden; /* Ensures no content spills out */
+    margin-top: 20px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); /* Subtle shadow for a modern look */
+}

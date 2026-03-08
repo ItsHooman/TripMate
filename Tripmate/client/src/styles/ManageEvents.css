@@ -1,0 +1,62 @@
+.event-management-container {
+    margin-top: 30px;
+    font-family: Cambria, Cochin, Georgia, Times, 'Times New Roman', serif, sans-serif;
+    color: #fff;
+  }
+  
+  .event-table {
+    width: 80%;
+    margin: 0 auto;
+    border-collapse: collapse;
+  }
+  
+  .event-table th, .event-table td {
+    padding: 12px;
+    border: 1px solid #ddd;
+    text-align: left;
+    color: rgb(36, 35, 35);
+  }
+  
+  .event-table th {
+    background-color: #f4f4f4;
+  }
+  
+  .Edit-button {
+    padding: 6px 12px;
+    margin-right: 10px;
+    text-decoration: none;
+    background-color: #19b02a;
+    border-radius: 10px;
+    color: white;
+    border: none;
+    cursor: pointer;
+  }
+
+  .Create-button{
+    padding: 6px 12px;
+    margin: 0 85%;
+    margin-bottom: 20px;
+    text-decoration: none;
+    background-color: #1d5eb8;
+    border-radius: 10px;
+    color: white;
+    border: none;
+    cursor: pointer;
+  }
+
+  .Delete-button{
+    font-size: 14px;
+    padding: 6px 12px;
+    margin-right: 10px;
+    text-decoration: none;
+    background-color: #ff0000;
+    border-radius: 10px;
+    color: white;
+    border: none;
+    cursor: pointer;
+  }
+  
+  .Edit-button:hover {
+    color: white;
+  }
+  

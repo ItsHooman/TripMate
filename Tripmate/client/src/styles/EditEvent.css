@@ -1,0 +1,149 @@
+/* EditEvent.css */
+
+.edit-event-container {
+  max-width: 800px;
+  margin: 20px auto;
+  padding: 20px;
+  background-color: #f9f9f9;
+  border-radius: 8px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+h2 {
+  text-align: center;
+  font-size: 2rem;
+  margin-bottom: 20px;
+  color: #333;
+}
+
+.edit-form-group {
+  margin-bottom: 20px;
+}
+
+.edit-label {
+  display: block;
+  font-weight: bold;
+  margin-bottom: 8px;
+  color: #555;
+}
+
+.edit-input, .edit-description, .edit-add-button {
+  width: 70%;
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 1rem;
+}
+
+.edit-input:focus, .edit-description:focus {
+  border-color: #007BFF;
+  outline: none;
+}
+
+.edit-description {
+  height: 150px;
+}
+
+button.edit-add-button {
+  background-color: #007BFF;
+  color: white;
+  border: none;
+  padding: 8px 12px;
+  margin-top: 10px;
+  cursor: pointer;
+  border-radius: 4px;
+  font-size: 1rem;
+}
+
+button.edit-add-button:hover {
+  background-color: #0056b3;
+}
+
+button.cancel-button {
+  background-color: #dc3545;
+  color: white;
+  border: none;
+  padding: 10px 15px;
+  margin-top: 10px;
+  cursor: pointer;
+  border-radius: 4px;
+  font-size: 1rem;
+  display: inline-block;
+}
+
+button.cancel-button:hover {
+  background-color: #c82333;
+}
+
+.edit-button {
+  background-color: #28a745;
+  color: white;
+  border: none;
+  padding: 12px 20px;
+  margin-top: 20px;
+  cursor: pointer;
+  border-radius: 4px;
+  font-size: 1rem;
+  display: inline-block;
+  width: 100%;
+}
+
+.edit-button:hover {
+  background-color: #218838;
+}
+
+.packing-list-item, .schedule-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.packing-list-item input, .schedule-item input {
+  width: 80%;
+  margin-right: 10px;
+}
+
+.packing-list-item button, .schedule-item button {
+  background-color: #dc3545;
+  color: white;
+  border: none;
+  padding: 5px 10px;
+  cursor: pointer;
+  font-size: 0.875rem;
+  border-radius: 4px;
+}
+
+.packing-list-item button:hover, .schedule-item button:hover {
+  background-color: #c82333;
+}
+
+.edit-form-group textarea {
+  resize: vertical;
+}
+
+.edit-form-group label {
+  font-size: 1rem;
+}
+
+.edit-form-group input {
+  font-size: 1rem;
+}
+
+@media (max-width: 768px) {
+  .edit-event-container {
+    padding: 15px;
+  }
+  
+  .edit-button {
+    font-size: 0.875rem;
+  }
+
+  .edit-input, .edit-description {
+    font-size: 0.875rem;
+  }
+
+  .edit-label {
+    font-size: 0.875rem;
+  }
+}

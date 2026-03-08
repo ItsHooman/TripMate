@@ -1,0 +1,180 @@
+  /* Matching Section */
+  .matching-section {
+    max-width: 1000px;
+    margin: 40px auto;
+    padding: 20px;
+    text-align: center;
+  }
+  
+  .matching-title {
+    font-size: 2rem;
+    font-weight: bold;
+    margin-bottom: 40px;
+    text-transform: uppercase;
+  }
+  
+  .setup-profile-button {
+    display: inline-block;
+    padding: 12px 24px;
+    font-size: 1.2rem;
+    font-weight: bold;
+    color: #fff;
+    background: #2e1605;
+    border-radius: 30px;
+    text-decoration: none;
+    margin-top: 30px;
+  }
+  
+  .setup-profile-button:hover {
+    background: #6E473B;
+  }
+
+  .profile-incomplete-text {
+    font-size: 1.2rem;
+    color: #6b4e39;
+    margin-top: 50px;
+  }
+  
+  /* Match List */
+  .match-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 50px;
+    justify-content: center;
+  }
+  
+  /* Match Card */
+  .match-card {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 16px;
+    box-shadow: 0 6px 15px rgba(0, 0, 0, 0.3);
+    backdrop-filter: blur(10px);
+    text-align: center;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+  }
+  
+  .match-card:hover {
+    transform: scale(1.05);
+    box-shadow: 0 8px 20px rgba(255, 255, 255, 0.2);
+  }
+  
+  /* Match Avatar */
+  .match-img-container {
+    position: relative;
+  }
+  
+  .match-avatar {
+    width: 100%;
+    height: 240px;
+    object-fit: cover;
+    border-radius: 8px;
+  }
+  
+  /* Similarity Badge */
+  .similarity-badge {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: #6E473B;
+    color: white;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 14px;
+    font-weight: bold;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  }
+  
+  /* Match Details */
+  .match-details {
+    margin-top: 12px;
+  }
+  
+  .match-name {
+    font-size: 1.4rem;
+    font-weight: bold;
+    color: white;
+  }
+  
+  .view-profile-link {
+    display: inline-block;
+    margin-top: 10px;
+    padding: 8px 16px;
+    background: #2e1605;
+    color: white;
+    border-radius: 8px;
+    text-decoration: none;
+    font-size: 14px;
+    transition: background 0.3s ease;
+  }
+  
+  .view-profile-link:hover {
+    background: #6E473B;
+  }
+  
+  /* No Matches */
+  .no-matches-text {
+    color: #bbb;
+    font-size: 1.1rem;
+    margin-top: 20px;
+  }
+  
+  /* Shimmer Effect (Loading) */
+  .loading-container {
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+    padding: 50px;
+  }
+  
+  .shimmer-card {
+    width: 280px;
+    height: 200px;
+    background: linear-gradient(90deg, #222 25%, #333 50%, #222 75%);
+    background-size: 400% 100%;
+    border-radius: 12px;
+    animation: shimmer 1.5s infinite linear;
+  }
+
+  /* Chat Button */
+.chat-button {
+    margin-top: 10px;
+    margin-left: 10px;
+    padding: 10px 15px;
+    font-size: 14px;
+    font-weight: bold;
+    background: #28a745;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.3s ease, transform 0.2s ease;
+  }
+  
+  .chat-button:hover {
+    background: #218838;
+    transform: scale(1.05);
+  }  
+
+  .progress-bar {
+    width: 100%;
+    height: 10px;
+  }
+  
+  .progress-bar-fill {
+    height: 100%;
+    background-color: #6E473B;
+    transition: width 0.5s ease;
+    border-radius: 20px;
+    margin-top: 8px;
+  }  
+  
+  @keyframes shimmer {
+    0% {
+      background-position: -400% 0;
+    }
+    100% {
+      background-position: 400% 0;
+    }
+  }
+  

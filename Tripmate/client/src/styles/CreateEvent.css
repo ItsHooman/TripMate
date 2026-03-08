@@ -1,0 +1,77 @@
+.create-event {
+    display: flex;
+    flex-direction: column;
+    justify-content: center; 
+    align-items: center;    
+    height: 100vh;          
+    padding: 0 20px;         
+  }
+  
+  .create-event__form {
+    align-items: center;
+    background-color: #fff;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    max-width: 400px;        
+    width: 100%;
+  }
+  
+  .create-event__title {
+    font-size: 1.8rem;
+    text-align: center;
+    color: #333;
+    margin-right: 20px;
+  }
+  
+  .create-event__error {
+    color: red;
+    font-size: 0.9rem;
+    margin-bottom: 10px;
+    text-align: center;
+  }
+
+  
+  .create-event__field {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    width: 95%;
+  }
+  
+  .create-event__field label {
+    font-weight: bold;
+    color: #555;
+  }
+  
+  .create-event__field input,
+  .create-event__field textarea {
+    width: 100%;
+    padding: 10px;
+    margin-bottom: 15px;
+    font-size: 16px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    outline: none;
+  }
+  
+  .create-event__field input::placeholder,
+  .create-event__field textarea::placeholder {
+    color: #999;
+    font-style: italic;
+  }
+  
+  .create-event__button {
+    background-color: #2e1605;
+    color: #fff;
+    padding: 10px 15px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 14px;
+    margin-right: 20px;
+  }
+  
+  .create-event__button:hover {
+    background-color: #6E473B;
+  }

@@ -1,0 +1,52 @@
+/* Gallery container with flexbox */
+.gallery {
+  display: flex;
+  gap: 0.7rem;
+  max-width: 80rem;
+  margin: 0 auto;
+  margin: 6%;
+  margin-bottom: 100px;
+}
+
+/* Individual card styling */
+.gallery-card {
+  position: relative;
+  width: 16rem;
+  height: 27rem;
+  border-radius: 1.2rem;
+  overflow: hidden;
+  transition: 0.4s ease-in-out;
+  flex: 0.25; 
+}
+
+.gallery-card img {
+  height: 100%;
+  width: 100%;
+  object-fit: cover; 
+  transition: 0.4s ease-in-out;
+}
+
+/* Hover effect on the card */
+.gallery-card:hover {
+  flex: 1; 
+  font-weight: bold;
+  cursor: pointer;
+  border-radius: 3rem;
+}
+
+/* Adjusting image position within the cards */
+.gallery-card:nth-child(1) img {
+  left: -8rem;
+}
+
+.gallery-card:nth-child(2) img {
+  left: -6rem;
+}
+
+.gallery-card:nth-child(3) img {
+  left: -14rem;
+}
+
+.gallery-card:nth-child(4) img {
+  left: -8rem;
+}

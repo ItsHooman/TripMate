@@ -1,0 +1,67 @@
+/* NotificationPage.css */
+
+.notification-page {
+    padding: 20px;
+  }
+  
+  .notification {
+    background-color: #f8f8f8;
+    border: 1px solid #ddd;
+    padding: 15px;
+    margin-bottom: 10px;
+    border-radius: 5px;
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .notification.read {
+    background-color: #e0e0e0;
+  }
+  
+  .notification.unread {
+    background-color: #fff8e1;
+  }
+  
+  .notification p {
+    font-size: 16px;
+    margin: 0;
+  }
+  
+  .action-buttons {
+    display: flex;
+    gap: 10px;
+    margin-top: 10px;
+  }
+  
+  .connect-button, .ignore-button {
+    padding: 10px;
+    font-size: 14px;
+    border-radius: 5px;
+    cursor: pointer;
+    border: none;
+  }
+  
+  .connect-button {
+    background-color: #4caf50;
+    color: white;
+  }
+  
+  .connect-button:hover {
+    background-color: #45a049;
+  }
+  
+  .ignore-button {
+    background-color: #f44336;
+    color: white;
+  }
+  
+  .ignore-button:hover {
+    background-color: #e53935;
+  }
+  
+  span {
+    margin-top: 10px;
+    font-size: 12px;
+    color: gray;
+  }
+  
