@@ -64,7 +64,7 @@ function ProfileSetup() {
 
         if (response.ok) {
             alert('Profile updated!');
-            navigate('/matching');
+            navigate('/welcome');
         } else {
             alert('Error updating profile');
         }

@@ -18,6 +18,7 @@ import NotificationPage from './pages/NotificationsPage';
 import EventManagement from './pages/ManageEvents';
 import ProtectedRoute from './components/ProtectedRoute';
 import "./styles/global.css";
+import WelcomeGuidePage from './pages/WelcomeGuidePage';
 
 function App() {
   return (
@@ -144,6 +145,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <UserManagement />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/welcome"
+            element={
+              <ProtectedRoute>
+                <WelcomeGuidePage />
               </ProtectedRoute>
             }
           />

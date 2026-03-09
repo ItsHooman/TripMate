@@ -51,6 +51,7 @@ function AuthLandingPage() {
       if (!response.ok) {
         throw new Error(data.message || data.error || "Registration failed");
       }
+      localStorage.removeItem("tripmateOnboardingSeen");
 
       // after successful register, switch to login tab
       setActiveTab("login");
@@ -99,7 +100,6 @@ function AuthLandingPage() {
 
     login(data.user, data.token);
 
-    // Fetch the user's profile after login
     const profileResponse = await fetch("/api/profile", {
       headers: {
         Authorization: `Bearer ${data.token}`,
@@ -119,8 +119,15 @@ function AuthLandingPage() {
       Array.isArray(profileData.preferredDestinations) &&
       profileData.preferredDestinations.length > 0;
 
+    const onboardingSeen =
+      localStorage.getItem("tripmateOnboardingSeen") === "true";
+
     if (profileComplete) {
-      navigate("/matching");
+      if (onboardingSeen) {
+        navigate("/matching");
+      } else {
+        navigate("/welcome");
+      }
     } else {
       navigate("/profile-setup");
     }
