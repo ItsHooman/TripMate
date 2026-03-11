@@ -1,35 +1,9 @@
-.matching-page-container {
-  position: relative;
-  height: 100dvh;
-  overflow: hidden;
-  background: var(--bg);
-  color: var(--text);
-  display: flex;
-  flex-direction: column;
-}
-
-/* DESKTOP FLOATING LOGO */
-
-.floating-logo {
-  position: absolute;
-  top: 18px;
-  left: 18px;
-  width: 88px;
-  height: 88px;
-  object-fit: contain;
-  z-index: 20;
-}
-
-/* MAIN AREA */
-
 .matching-page-inner {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  overflow-x: hidden;
-  padding: 16px 16px 20px;
+  min-height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
 }
-
 .matching-main-stack {
   width: 100%;
   min-height: 100%;
@@ -225,17 +199,8 @@
 
 /* BOTTOM NAV */
 
-.matching-bottom-nav-wrap {
-  flex-shrink: 0;
-  padding: 0 16px 10px;
-  display: flex;
-  justify-content: center;
-}
 
-.matching-bottom-nav-wrap .bottom-nav {
-  width: 100%;
-  max-width: 760px;
-}
+
 
 /* ---------------- MOBILE ---------------- */
 

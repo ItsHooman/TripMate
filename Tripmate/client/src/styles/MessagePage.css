@@ -1,5 +1,7 @@
-.messages-page {
-  min-height: 100vh;
+.messages-page-inner {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
 }
 
 .page-title {
@@ -190,6 +192,7 @@
 
 .send-btn {
   padding: 12px 18px;
+  border: none;
   border-radius: 999px;
   background: var(--primary);
   color: #fff;

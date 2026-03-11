@@ -2,7 +2,7 @@ import React, { useContext, useEffect, useMemo, useState } from "react";
 import TinderCard from "react-tinder-card";
 import { Link, useNavigate } from "react-router-dom";
 import { io } from "socket.io-client";
-
+import AppShell from "../components/AppShell";
 import { AuthContext } from "../context/AuthContext";
 import API_BASE_URL from "../config/api";
 import BottomNav from "../components/BottomNav";
@@ -198,13 +198,7 @@ function MatchingPage() {
   };
 
   return (
-  <div className="matching-page-container">
-    <img
-      src="/logo.png"
-      alt="TripMate Logo"
-      className="floating-logo"
-    />
-
+  <AppShell className="matching-page-container">
     <div className="matching-page-inner">
       {loading ? (
         <p className="matching-status-text">Loading matches...</p>
@@ -296,11 +290,7 @@ function MatchingPage() {
         <p className="matching-status-text">No matches found yet.</p>
       )}
     </div>
-
-    <div className="matching-bottom-nav-wrap">
-      <BottomNav />
-    </div>
-  </div>
+  </AppShell>
 );
 }
 

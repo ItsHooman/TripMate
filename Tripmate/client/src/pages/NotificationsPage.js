@@ -1,11 +1,14 @@
-import React, { useState, useEffect, useContext } from 'react';
-import { useNavigate } from 'react-router-dom';
-import io from 'socket.io-client';
-import { AuthContext } from "../context/AuthContext";
-import '../styles/NotificationPage.css';
+import React, { useState, useEffect, useContext } from "react";
+import { useNavigate } from "react-router-dom";
+import io from "socket.io-client";
 
-const SOCKET_SERVER_URL = 'http://localhost:5002';
-const socket = io(SOCKET_SERVER_URL);
+import { AuthContext } from "../context/AuthContext";
+import "../styles/NotificationPage.css";
+import AppShell from "../components/AppShell";
+import API_BASE_URL from "../config/api";
+
+const SOCKET_SERVER_URL =
+  process.env.REACT_APP_SOCKET_URL || "http://localhost:5002";
 
 function NotificationPage() {
   const [notifications, setNotifications] = useState([]);
@@ -14,123 +17,169 @@ function NotificationPage() {
   const navigate = useNavigate();
 
   useEffect(() => {
+    if (!userId) return;
+
     const fetchNotifications = async () => {
       try {
-        const response = await fetch(`/api/notifications/${userId}`);
+        const response = await fetch(`${API_BASE_URL}/notifications/${userId}`);
         const data = await response.json();
-        setNotifications(data);
-        localStorage.setItem('notifications', JSON.stringify(data));
+        const safeData = Array.isArray(data) ? data : [];
+        setNotifications(safeData);
+        localStorage.setItem("notifications", JSON.stringify(safeData));
       } catch (error) {
-        console.error('Error fetching notifications:', error);
+        console.error("Error fetching notifications:", error);
       }
     };
-  
+
     fetchNotifications();
-    const interval = setInterval(fetchNotifications, 5000); 
-  
+    const interval = setInterval(fetchNotifications, 5000);
+
     return () => clearInterval(interval);
   }, [userId]);
-  
-  useEffect(() => {
-    if (userId) {
-      socket.emit('registerUser', userId);
-    }
-  }, [userId]);
 
   useEffect(() => {
-    if (loading) return;
-    if (!userId) {
-      console.error('User ID is missing');
-      return;
-    }
+    if (!userId || loading) return;
 
-    socket.on('connectionRequest', (data) => {
+    const socket = io(SOCKET_SERVER_URL, { transports: ["websocket"] });
+
+    socket.emit("registerUser", userId);
+
+    socket.on("connectionRequest", (data) => {
       const { senderId, user } = data;
-      setNotifications((prev) => [
-        ...prev,
-        {
-          type: 'connectionRequest',
-          senderId,
-          senderName: user.name,
-          message: `${user.name} wants to connect with you.`,
-          read: false,
-        },
-      ]);
+
+      setNotifications((prev) => {
+        const updated = [
+          ...prev,
+          {
+            type: "connectionRequest",
+            senderId,
+            senderName: user?.name || "Anonymous",
+            message: `${user?.name || "Someone"} wants to connect with you.`,
+            read: false,
+          },
+        ];
+
+        localStorage.setItem("notifications", JSON.stringify(updated));
+        return updated;
+      });
     });
 
-    // Remove notifications when a connection is accepted
-    socket.on('connectionAccepted', (data) => {
+    socket.on("connectionAccepted", (data) => {
       const { senderName } = data;
-      setNotifications((prev) => prev.filter((notif) => notif.senderName !== senderName));
-      updateLocalStorage();
+
+      setNotifications((prev) => {
+        const updated = prev.filter((notif) => notif.senderName !== senderName);
+        localStorage.setItem("notifications", JSON.stringify(updated));
+        return updated;
+      });
     });
 
     return () => {
-      socket.off('connectionRequest');
-      socket.off('connectionAccepted');
+      socket.off("connectionRequest");
+      socket.off("connectionAccepted");
+      socket.disconnect();
     };
   }, [userId, loading]);
-
-  const updateLocalStorage = () => {
-    localStorage.setItem('notifications', JSON.stringify(notifications));
-  };
 
   const handleConnect = async (senderId, senderName) => {
     if (!userId) return;
 
-    console.log('Accepted connection from', senderId);
-    socket.emit('acceptConnection', { senderId, userId });
+    const socket = io(SOCKET_SERVER_URL, { transports: ["websocket"] });
+    socket.emit("acceptConnection", { senderId, userId });
 
-    const response = await fetch(`/api/matche/users/${senderId}`);
-    const senderProfile = await response.json();
+    try {
+      const response = await fetch(`${API_BASE_URL}/matche/users/${senderId}`);
+      const senderProfile = await response.json();
 
-    console.log('senderProfile:', senderProfile);
+      setNotifications((prev) => {
+        const updated = prev.filter((notif) => notif.senderId !== senderId);
+        localStorage.setItem("notifications", JSON.stringify(updated));
+        return updated;
+      });
 
-    setNotifications((prev) => prev.filter((notif) => notif.senderId !== senderId));
-    updateLocalStorage();
+      const storedUsers =
+        JSON.parse(localStorage.getItem("connectedUsers")) || [];
 
-    const storedUsers = JSON.parse(localStorage.getItem('connectedUsers')) || [];
-    const updatedConnectedUsers = [...storedUsers, { 
-      _id: senderId,
-      profile: { name: senderName, profilePicture: senderProfile.profile?.profilePicture } 
-    }];
+      const alreadyExists = storedUsers.some((user) => user._id === senderId);
 
-    localStorage.setItem('connectedUsers', JSON.stringify(updatedConnectedUsers));
+      const updatedConnectedUsers = alreadyExists
+        ? storedUsers
+        : [
+            ...storedUsers,
+            {
+              _id: senderId,
+              profile: {
+                name: senderName,
+                profilePicture: senderProfile.profile?.profilePicture,
+              },
+            },
+          ];
 
-    navigate('/messages', {
-      state: { connectedUsers: updatedConnectedUsers, currentUserId: userId },
-    });
+      localStorage.setItem(
+        "connectedUsers",
+        JSON.stringify(updatedConnectedUsers)
+      );
+
+      navigate("/messages", {
+        state: {
+          connectedUsers: updatedConnectedUsers,
+          currentUserId: userId,
+        },
+      });
+    } catch (error) {
+      console.error("Error accepting connection:", error);
+    } finally {
+      socket.disconnect();
+    }
   };
 
   const handleIgnore = (senderId) => {
-    console.log('Ignored connection from', senderId);
-    setNotifications((prev) => prev.filter((notif) => notif.senderId !== senderId));
-    updateLocalStorage();
+    setNotifications((prev) => {
+      const updated = prev.filter((notif) => notif.senderId !== senderId);
+      localStorage.setItem("notifications", JSON.stringify(updated));
+      return updated;
+    });
   };
 
   return (
-    <div className="notification-page">
-      <h3>Notifications</h3>
-      {notifications.length === 0 ? (
-        <p>No new notifications</p>
-      ) : (
-        notifications.map((notif, index) => (
-          <div key={index} className={`notification ${notif.read ? 'read' : 'unread'}`}>
-            <p>{notif.message}</p>
-            {notif.type === 'connectionRequest' && (
-              <div className="action-buttons">
-                <button className="connect-button" onClick={() => handleConnect(notif.senderId, notif.senderName)}>
-                  Connect
-                </button>
-                <button className="ignore-button" onClick={() => handleIgnore(notif.senderId)}>
-                  Ignore
-                </button>
-              </div>
-            )}
-          </div>
-        ))
-      )}
-    </div>
+    <AppShell className="notification-page">
+      <div className="app-page notification-page-inner">
+        <h2 className="page-title">Notifications</h2>
+
+        {notifications.length === 0 ? (
+          <p className="notification-empty-text">No new notifications</p>
+        ) : (
+          notifications.map((notif, index) => (
+            <div
+              key={index}
+              className={`notification ${notif.read ? "read" : "unread"}`}
+            >
+              <p>{notif.message}</p>
+
+              {notif.type === "connectionRequest" && (
+                <div className="action-buttons">
+                  <button
+                    className="connect-button"
+                    onClick={() =>
+                      handleConnect(notif.senderId, notif.senderName)
+                    }
+                  >
+                    Connect
+                  </button>
+
+                  <button
+                    className="ignore-button"
+                    onClick={() => handleIgnore(notif.senderId)}
+                  >
+                    Ignore
+                  </button>
+                </div>
+              )}
+            </div>
+          ))
+        )}
+      </div>
+    </AppShell>
   );
 }
 
