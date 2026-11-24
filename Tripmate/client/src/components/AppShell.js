@@ -1,15 +1,23 @@
 import React from "react";
 import BottomNav from "./BottomNav";
+import TripMateLogo from "./TripMateLogo";
 import "../styles/AppShell.css";
 
 function AppShell({ children, className = "" }) {
   return (
     <div className={`app-shell-page ${className}`.trim()}>
-      <img
-        src="/logo.png"
-        alt="TripMate Logo"
-        className="app-shell-logo"
-      />
+
+      <header className="app-shell-header">
+        <div className="app-shell-header-inner">
+
+          <TripMateLogo />
+
+          <span className="app-shell-tagline">
+            Discover. Connect. Travel.
+          </span>
+
+        </div>
+      </header>
 
       <main className="app-shell-content">
         {children}
@@ -18,6 +26,7 @@ function AppShell({ children, className = "" }) {
       <div className="app-shell-bottom-nav">
         <BottomNav />
       </div>
+
     </div>
   );
 }

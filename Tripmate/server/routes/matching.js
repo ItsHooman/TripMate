@@ -1,138 +1,304 @@
+
 const express = require('express');
-const bcrypt = require('bcrypt');
-const jwt = require('jsonwebtoken');
-const math = require('mathjs'); 
+const mongoose = require('mongoose');
 const authenticate = require('../middleware/auth');
 const User = require('../models/User');
-const Profile = require('../models/Profile');  
+const Profile = require('../models/Profile');
+
+const {
+    calculateCompatibility,
+    isProfileComplete,
+} = require('../utils/matchingAlgorithm');
 
 const router = express.Router();
 
-/**
- * Helper function to calculate Cosine Similarity between two users' interests.
- */
-function calculateSimilarity(profile1, profile2) {
-    if (!profile1 || !profile2) return 0;
+const PUBLIC_PROFILE_FIELDS =
+    'name bio interests preferredDestinations ' +
+    'location travelStyle profilePicture';
 
-    const interests1 = (profile1.interests || []).map(interest => interest.toLowerCase().trim());
-    const interests2 = (profile2.interests || []).map(interest => interest.toLowerCase().trim());
+// Build ranked recommendations
+async function getRecommendations(userId) {
+    const currentUser = await User.findById(userId)
+        .select('profile contacts status isActive isBanned')
+        .populate('profile')
+        .lean();
 
-    const allInterests = Array.from(new Set([...interests1, ...interests2]));
+    if (!currentUser) {
+        return {
+            status: 404,
+            message: 'User not found.',
+        };
+    }
 
-    const vector1 = allInterests.map(interest => interests1.includes(interest) ? 1 : 0);
-    const vector2 = allInterests.map(interest => interests2.includes(interest) ? 1 : 0);
+    if (
+        currentUser.status === 'banned' ||
+        currentUser.isBanned ||
+        currentUser.isActive === false
+    ) {
+        return {
+            status: 403,
+            message: 'Account is not active.',
+        };
+    }
 
-    const dotProduct = math.dot(vector1, vector2);
-    const magnitude1 = math.norm(vector1);
-    const magnitude2 = math.norm(vector2);
+    // Fall back to Profile.user if User.profile is missing
+    const currentProfile =
+        currentUser.profile ||
+        await Profile.findOne({ user: userId }).lean();
 
-    const similarity = magnitude1 && magnitude2 ? dotProduct / (magnitude1 * magnitude2) : 0;
+    if (!isProfileComplete(currentProfile)) {
+        return {
+            status: 400,
+            code: 'PROFILE_INCOMPLETE',
+            message: 'Complete your profile to discover travelers.',
+        };
+    }
 
-    console.log("Similarity Score:", similarity);
-    return similarity;
-}
+    const excludedIds = [
+        userId,
+        ...(currentUser.contacts || []),
+    ];
 
-/**
- * GET /api/match
- * Returns AI-powered user matches based on interests and preferences.
- */
-// Backend Route (assuming you have the route for AI-powered matches)
-router.get('/match', authenticate, async (req, res) => {
-    try {
-        const userId = req.user.id;
-        
-        const currentUser = await User.findById(userId).populate('profile');
+    const users = await User.find({
+        _id: { $nin: excludedIds },
+        role: { $ne: 'admin' },
+        status: { $ne: 'banned' },
+        isBanned: { $ne: true },
+        isActive: { $ne: false },
+    })
+        .select('_id name role')
+        .lean();
 
-        if (!currentUser || !currentUser.profile) {
-            return res.status(404).json({ message: "Current user's profile not found." });
-        }
+    const profiles = await Profile.find({
+        user: { $in: users.map(user => user._id) },
+    })
+        .select(`user ${PUBLIC_PROFILE_FIELDS}`)
+        .lean();
 
-        const users = await User.find({ _id: { $ne: userId } }).populate('profile');
+    const profileMap = new Map(
+        profiles.map(profile => [
+            String(profile.user),
+            profile,
+        ])
+    );
 
-        let recommendations = [];
+    const recommendations = users
+        .map(user => {
+            const profile = profileMap.get(String(user._id));
 
-        users.forEach(user => {
-            if (!user.profile) return; 
-
-            const similarityScore = calculateSimilarity(currentUser.profile, user.profile);
-
-            if (similarityScore > 0.3) { 
-                recommendations.push({
-                    user: {
-                        _id: user._id,
-                        name: user.profile.name,
-                        profilePicture: user.profile.profilePicture
-                    },
-                    similarityScore: Math.round(similarityScore * 100) 
-                });
+            if (!isProfileComplete(profile)) {
+                return null;
             }
+
+            const compatibility = calculateCompatibility(
+                currentProfile,
+                profile
+            );
+
+            return {
+                _id: user._id,
+                name: profile.name || user.name,
+                role: user.role,
+                profile,
+                ...compatibility,
+            };
+        })
+        .filter(Boolean)
+        .sort((a, b) => {
+            return (
+                b.similarityScore - a.similarityScore ||
+                b.sharedDestinations.length -
+                    a.sharedDestinations.length ||
+                b.sharedInterests.length -
+                    a.sharedInterests.length ||
+                String(a._id).localeCompare(String(b._id))
+            );
         });
 
-        recommendations.sort((a, b) => b.similarityScore - a.similarityScore);
+    return {
+        status: 200,
+        matches: recommendations,
+    };
+}
 
-        res.json({ matches: recommendations });
+/*
+ * GET /api/matche
+ * Main discovery endpoint
+ */
+router.get('/', authenticate, async (req, res) => {
+    try {
+        const result = await getRecommendations(req.user.id);
+
+        if (result.status !== 200) {
+            return res.status(result.status).json({
+                code: result.code,
+                message: result.message,
+            });
+        }
+
+        let matches = result.matches;
+
+        // Preserve optional preference filters
+        if (req.query.preferences) {
+            let preferences;
+
+            try {
+                preferences = JSON.parse(req.query.preferences);
+
+                if (
+                    !preferences ||
+                    typeof preferences !== 'object' ||
+                    Array.isArray(preferences)
+                ) {
+                    throw new Error('Invalid preferences');
+                }
+            } catch {
+                return res.status(400).json({
+                    message: 'Invalid preferences format.',
+                });
+            }
+
+            const { normalizeList } =
+                require('../utils/matchingAlgorithm');
+
+            const interests = normalizeList(
+                preferences.interests
+            );
+
+            const destinations = normalizeList(
+                preferences.preferredDestinations
+            );
+
+            const travelStyle = String(
+                preferences.travelStyle || ''
+            ).trim().toLowerCase();
+
+            matches = matches.filter(({ profile }) => {
+                const profileInterests = normalizeList(
+                    profile.interests
+                );
+
+                const profileDestinations = normalizeList(
+                    profile.preferredDestinations
+                );
+
+                return (
+                    (
+                        !interests.length ||
+                        interests.some(item =>
+                            profileInterests.includes(item)
+                        )
+                    ) &&
+                    (
+                        !destinations.length ||
+                        destinations.some(item =>
+                            profileDestinations.includes(item)
+                        )
+                    ) &&
+                    (
+                        !travelStyle ||
+                        String(profile.travelStyle || '')
+                            .trim()
+                            .toLowerCase() === travelStyle
+                    )
+                );
+            });
+        }
+
+        res.json(matches);
+
     } catch (error) {
         console.error('Error fetching matches:', error);
-        res.status(500).json({ error: 'An error occurred while fetching matches.' });
+
+        res.status(500).json({
+            message: 'Unable to find travelers.',
+        });
     }
 });
 
-
-router.get('/', authenticate, async (req, res) => {
-    try {
-    const { preferences } = req.query;
-    
-    const users = await User. find()
-    .populate('profile');
-    
-    console.log(users);
-    
-    let matches = users;
-    
-    if (preferences) {
-    const parsedPreferences = JSON.parse(preferences);
-    const { interests, preferredDestinations, travelStyle } = parsedPreferences;
-    
-    matches = matches. filter((user) => {
-    const profile = user.profile;
-    
-    return (
-    (!interests || profile.interests.some((interest) =>
-    interests.includes(interest)
-    )) &&
-    (!preferredDestinations || profile.preferredDestinations.some((dest) =>
-    preferredDestinations.includes(dest)
-    )) &&
-    (!travelStyle || profile.travelStyle === travelStyle)
-    );
-    });
-    }
-    
-    res.json(matches);
-    } catch (error) {
-    console.error('Error fetching matches:', error);
-    res.status(500).json({ error: 'An error occurred while fetching matches.' });
-    }
-    });
-
-
-/**
- * GET /api/users/:userId
- * Fetch a specific user by ID.
+/*
+ * GET /api/matche/match
+ * Compatibility endpoint for Suggestedmatching.js
  */
-router.get('/users/:userId', async (req, res) => {
+router.get('/match', authenticate, async (req, res) => {
     try {
-        const userId = req.params.userId;
-        const user = await User.findById(userId).populate('profile');
+        const result = await getRecommendations(req.user.id);
 
-        if (!user) {
-            return res.status(404).json({ message: 'User not found' });
+        if (result.status !== 200) {
+            return res.status(result.status).json({
+                code: result.code,
+                message: result.message,
+            });
         }
 
-        res.json(user);
+        const matches = result.matches.map(match => ({
+            ...match,
+
+            user: {
+                _id: match._id,
+                name: match.profile.name,
+                profilePicture: match.profile.profilePicture,
+            },
+        }));
+
+        res.json({ matches });
+
+    } catch (error) {
+        console.error('Error fetching recommendations:', error);
+
+        res.status(500).json({
+            message: 'Unable to calculate recommendations.',
+        });
+    }
+});
+
+/*
+ * GET /api/matche/users/:userId
+ * Get a traveler's public profile
+ */
+router.get('/users/:userId', authenticate, async (req, res) => {
+    try {
+        const { userId } = req.params;
+
+        if (!mongoose.isValidObjectId(userId)) {
+            return res.status(400).json({
+                message: 'Invalid user ID.',
+            });
+        }
+
+        const user = await User.findOne({
+            _id: userId,
+            role: { $ne: 'admin' },
+            status: { $ne: 'banned' },
+            isBanned: { $ne: true },
+            isActive: { $ne: false },
+        })
+            .select('_id name role')
+            .lean();
+
+        if (!user) {
+            return res.status(404).json({
+                message: 'User not found.',
+            });
+        }
+
+        const profile = await Profile.findOne({
+            user: userId,
+        })
+            .select(PUBLIC_PROFILE_FIELDS)
+            .lean();
+
+        res.json({
+            ...user,
+            profile,
+        });
+
     } catch (error) {
         console.error('Error fetching user:', error);
-        res.status(500).json({ message: 'Server error' });
+
+        res.status(500).json({
+            message: 'Server error.',
+        });
     }
 });
 

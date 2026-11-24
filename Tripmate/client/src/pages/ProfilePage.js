@@ -1,23 +1,27 @@
-import React, { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import React, { useState, useEffect, useContext } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import {
-  FaUserAlt,
   FaMapMarkedAlt,
   FaCalendarAlt,
   FaHeart,
   FaGlobeAmericas,
   FaEnvelope,
+  FaPen,
+  FaSignOutAlt,
+  FaUserAlt,
 } from "react-icons/fa";
 
 import "../styles/ProfilePage.css";
 import AppShell from "../components/AppShell";
 import API_BASE_URL from "../config/api";
+import { AuthContext } from "../context/AuthContext";
 
 function ProfilePage() {
   const [profile, setProfile] = useState(null);
   const [error, setError] = useState("");
-  const defaultProfilePicture =
-    "https://i.postimg.cc/rwk4Qqd6/avatar-account-flat-isolated-on-transparent-background-for-graphic-and-web-design-default-social-med.jpg";
+
+  const navigate = useNavigate();
+  const { logout } = useContext(AuthContext);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -52,89 +56,191 @@ function ProfilePage() {
     fetchProfile();
   }, []);
 
+  const handleLogout = async () => {
+    if (typeof logout !== "function") {
+      setError("Logout is not configured in AuthContext.");
+      return;
+    }
+
+    try {
+      await logout();
+
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+      localStorage.removeItem("connectedUsers");
+      localStorage.removeItem("likedUsers");
+
+      navigate("/", { replace: true });
+    } catch (err) {
+      console.error(err);
+      setError("Unable to log out. Please try again.");
+    }
+  };
+
+  const interests = Array.isArray(profile?.interests)
+    ? profile.interests
+    : typeof profile?.interests === "string"
+    ? profile.interests
+        .split(",")
+        .map((interest) => interest.trim())
+        .filter(Boolean)
+    : [];
+
   return (
     <AppShell className="profilePage-container">
       <div className="app-page profile-page-inner">
-        {error ? (
-          <p className="error-message">{error}</p>
-        ) : !profile ? (
-          <p className="profile-loading-text">Loading...</p>
+
+        {!profile ? (
+          <p className={error ? "error-message" : "profile-loading-text"}>
+            {error || "Loading your profile..."}
+          </p>
         ) : (
           <div className="profilePage-card">
-            <div className="profilePage-image-container">
-              <img
-                src={profile.profilePicture || defaultProfilePicture}
-                alt="Profile"
-                className="profilePage-image"
-                onError={(e) => {
-                  e.target.onerror = null;
-                  e.target.src = defaultProfilePicture;
-                }}
-              />
+
+            {/* PROFILE HEADER */}
+
+            <div className="profilePage-header">
+              <h1 className="profilePage-title">My Profile</h1>
+
+              <div className="profilePage-image-container">
+                {profile.profilePicture ? (
+                  <img
+                    src={profile.profilePicture}
+                    alt="Profile"
+                    className="profilePage-image"
+                    onError={() =>
+                      setProfile((previous) => ({
+                        ...previous,
+                        profilePicture: null,
+                      }))
+                    }
+                  />
+                ) : (
+                  <FaUserAlt className="profilePage-default-avatar" />
+                )}
+              </div>
+
+              <h2 className="profilePage-name">
+                {profile.name || "Anonymous"}
+              </h2>
+
+              <div className="profilePage-location">
+                <FaMapMarkedAlt />
+                <span>
+                  {profile.location || "Location not specified"}
+                </span>
+              </div>
             </div>
 
+            {/* PERSONAL INFORMATION */}
+
             <div className="profilePage-info">
+              <h3 className="profilePage-section-title">
+                Personal Information
+              </h3>
+
               <div className="profilePage-details">
-                <div className="profilePage-detail">
-                  <FaUserAlt className="profilePage-icon" />
-                  <p>
-                    <strong>Name:</strong> {profile.name || "Not provided"}
-                  </p>
-                </div>
+
+                {/* EMAIL */}
 
                 <div className="profilePage-detail">
                   <FaEnvelope className="profilePage-icon" />
-                  <p>
-                    <strong>Email:</strong> {profile.email || "Not provided"}
-                  </p>
+
+                  <div className="profilePage-detail-content">
+                    <span className="profilePage-label">Email</span>
+                    <p>{profile.email || "Not provided"}</p>
+                  </div>
                 </div>
+
+                {/* BIO */}
 
                 <div className="profilePage-detail">
                   <FaHeart className="profilePage-icon" />
-                  <p>
-                    <strong>Bio:</strong> {profile.bio || "No bio added yet."}
-                  </p>
+
+                  <div className="profilePage-detail-content">
+                    <span className="profilePage-label">Bio</span>
+                    <p>{profile.bio || "No bio added yet."}</p>
+                  </div>
                 </div>
+
+                {/* INTERESTS */}
 
                 <div className="profilePage-detail">
                   <FaGlobeAmericas className="profilePage-icon" />
-                  <p>
-                    <strong>Interests:</strong>{" "}
-                    {profile.interests?.length
-                      ? profile.interests.join(", ")
-                      : "No interests added yet."}
-                  </p>
+
+                  <div className="profilePage-detail-content">
+                    <span className="profilePage-label">
+                      Interests
+                    </span>
+
+                    {interests.length > 0 ? (
+                      <div className="profilePage-interests">
+                        {interests.map((interest, index) => (
+                          <span
+                            key={index}
+                            className="profilePage-interest-tag"
+                          >
+                            {interest}
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <p>No interests added yet.</p>
+                    )}
+                  </div>
                 </div>
 
-                <div className="profilePage-detail">
-                  <FaMapMarkedAlt className="profilePage-icon" />
-                  <p>
-                    <strong>Location:</strong>{" "}
-                    {profile.location || "Not provided"}
-                  </p>
-                </div>
+                {/* TRAVEL DATES */}
 
                 <div className="profilePage-detail">
                   <FaCalendarAlt className="profilePage-icon" />
-                  <p>
-                    <strong>Travel Dates:</strong>{" "}
-                    {profile.travelDates?.start && profile.travelDates?.end
-                      ? `${new Date(profile.travelDates.start).toLocaleDateString()} - ${new Date(profile.travelDates.end).toLocaleDateString()}`
-                      : "No travel dates specified"}
-                  </p>
+
+                  <div className="profilePage-detail-content">
+                    <span className="profilePage-label">
+                      Travel Dates
+                    </span>
+
+                    <p>
+                      {profile.travelDates?.start &&
+                      profile.travelDates?.end
+                        ? `${new Date(
+                            profile.travelDates.start
+                          ).toLocaleDateString()} - ${new Date(
+                            profile.travelDates.end
+                          ).toLocaleDateString()}`
+                        : "No travel dates specified"}
+                    </p>
+                  </div>
                 </div>
-              </div>
 
-              <div className="profilePage-actions">
-                <Link to="/profile-setup">
-                  <button className="profile-edit-button">Edit Profile</button>
-                </Link>
-
-                <Link className="dashboard-link" to="/matching">
-                  Back to Matching
-                </Link>
               </div>
             </div>
+
+            {/* PROFILE ACTIONS */}
+
+            <div className="profilePage-actions">
+              <Link
+                to="/profile-setup"
+                className="profile-edit-button"
+              >
+                <FaPen />
+                Edit Profile
+              </Link>
+
+              <button
+                type="button"
+                className="profile-logout-button"
+                onClick={handleLogout}
+              >
+                <FaSignOutAlt />
+                Log Out
+              </button>
+            </div>
+
+            {error && (
+              <p className="error-message">{error}</p>
+            )}
+
           </div>
         )}
       </div>

@@ -4,6 +4,7 @@ const path = require('path');
 const Profile = require('../models/Profile');
 const authenticate = require('../middleware/auth');
 const router = express.Router();
+const User = require('../models/User');
 
 // Configure multer
 const storage = multer.diskStorage({
@@ -77,6 +78,13 @@ router.post('/', authenticate, upload.single('profilePicture'), async (req, res)
         }
 
         await profile.save();
+
+        await User.findByIdAndUpdate(req.user.id, {
+            $set: {
+                profile: profile._id,
+            },
+        });
+
         res.status(200).json(profile);
     } catch (err) {
         res.status(500).json({ message: 'Server error', error: err.message });

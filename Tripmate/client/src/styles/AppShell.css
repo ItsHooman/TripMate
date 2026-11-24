@@ -1,5 +1,10 @@
+/* ========================================
+   APP SHELL
+======================================== */
+
 .app-shell-page {
   position: relative;
+  width: 100%;
   height: 100dvh;
   overflow: hidden;
   background: var(--bg);
@@ -8,65 +13,179 @@
   flex-direction: column;
 }
 
-.app-shell-logo {
-  position: absolute;
-  top: 18px;
-  left: 18px;
-  width: 88px;
-  height: 88px;
-  object-fit: contain;
-  z-index: 20;
+/* ========================================
+   HEADER
+======================================== */
+
+.app-shell-header {
+  position: relative;
+  flex-shrink: 0;
+  width: 100%;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  z-index: 50;
 }
+
+.app-shell-header-inner {
+  width: 100%;
+  max-width: 1440px;
+  min-height: 68px;
+  margin: 0 auto;
+  padding: 0 32px;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+/* ========================================
+   TRIPMATE BRAND
+======================================== */
+
+.tripmate-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 11px;
+  flex-shrink: 0;
+  color: var(--primary);
+  text-decoration: none;
+  transition: opacity 0.2s ease;
+}
+
+.tripmate-brand:hover {
+  opacity: 0.85;
+}
+
+.tripmate-brand-icon {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  color: var(--primary);
+}
+
+.tripmate-brand-name {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1.8rem;
+  font-weight: 700;
+  letter-spacing: -1px;
+  line-height: 1;
+  color: var(--primary);
+}
+
+.app-shell-tagline {
+  color: var(--muted);
+  font-size: 0.85rem;
+  letter-spacing: 0.5px;
+}
+
+/* ========================================
+   MAIN CONTENT
+======================================== */
 
 .app-shell-content {
   flex: 1;
   min-height: 0;
+  width: 100%;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 16px 16px 20px;
+  padding: 24px 24px 20px;
 }
+
+/* ========================================
+   BOTTOM NAVIGATION
+======================================== */
 
 .app-shell-bottom-nav {
   flex-shrink: 0;
-  padding: 0 16px 10px;
+  width: 100%;
+  padding: 8px 16px 12px;
   display: flex;
   justify-content: center;
+  background: var(--bg);
 }
 
 .app-shell-bottom-nav .bottom-nav {
+  position: relative;
+  left: auto;
+  bottom: auto;
+  transform: none;
   width: 100%;
   max-width: 760px;
 }
 
-@media (max-width: 640px) {
-  .app-shell-page::before {
-    content: "";
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 72px;
-    background: var(--bg);
-    border-bottom: 1px solid var(--border);
-    backdrop-filter: blur(6px);
-    z-index: 10;
-  }
+/* ========================================
+   TABLET
+======================================== */
 
-  .app-shell-logo {
-    top: 10px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 54px;
-    height: 54px;
+@media (max-width: 900px) {
+  .app-shell-header-inner {
+    padding: 0 24px;
   }
 
   .app-shell-content {
-    padding-top: 80px;
-    padding-left: 10px;
-    padding-right: 10px;
+    padding: 20px 16px;
+  }
+}
+
+/* ========================================
+   MOBILE
+======================================== */
+
+@media (max-width: 640px) {
+  .app-shell-header-inner {
+    min-height: 58px;
+    padding: 0 16px;
+  }
+
+  .tripmate-brand {
+    gap: 9px;
+  }
+
+  .tripmate-brand-icon {
+    width: 34px;
+    height: 34px;
+  }
+
+  .tripmate-brand-name {
+    font-size: 1.55rem;
+    letter-spacing: -0.8px;
+  }
+
+  .app-shell-tagline {
+    display: none;
+  }
+
+  .app-shell-content {
+    padding: 16px 12px;
   }
 
   .app-shell-bottom-nav {
-    padding: 0 8px 8px;
+    padding: 6px 8px
+      calc(8px + env(safe-area-inset-bottom));
+  }
+}
+
+/* ========================================
+   SMALL PHONES
+======================================== */
+
+@media (max-width: 360px) {
+  .app-shell-header-inner {
+    min-height: 54px;
+    padding: 0 12px;
+  }
+
+  .tripmate-brand-icon {
+    width: 30px;
+    height: 30px;
+  }
+
+  .tripmate-brand-name {
+    font-size: 1.4rem;
+  }
+
+  .app-shell-content {
+    padding: 12px 8px;
   }
 }

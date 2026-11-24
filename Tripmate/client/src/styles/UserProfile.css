@@ -1,146 +1,638 @@
-.user-profile-page-inner {
+
+/* ========================================
+   PUBLIC USER PROFILE
+======================================== */
+
+.public-profile-inner {
   width: 100%;
-  max-width: 1100px;
+  max-width: 680px;
   margin: 0 auto;
+  padding: 12px 0 24px;
+  min-width: 0;
 }
 
-.profile-loading-text {
-  text-align: center;
-  color: var(--muted);
-  font-size: 1rem;
-  margin-top: 40px;
-}
+/* BACK BUTTON */
 
-.error-message {
-  text-align: center;
-  color: #b42318;
-  font-size: 1rem;
-  margin-top: 40px;
-}
-
-.report-modal {
-  position: fixed;
-  inset: 0;
-  background: rgba(47, 36, 31, 0.42);
-  display: flex;
+.public-profile-back {
+  display: inline-flex;
   align-items: center;
-  justify-content: center;
-  padding: 20px;
-  z-index: 1000;
-}
-
-.report-modal-content {
-  width: 100%;
-  max-width: 380px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 20px;
-  box-shadow: var(--shadow-card);
-  padding: 22px;
-  text-align: left;
-}
-
-.report-modal-content h2 {
-  margin: 0 0 14px;
-  font-size: 1.4rem;
-  color: var(--text);
-  text-align: center;
-}
-
-.report-modal-content > div:not(.report-modal-actions) {
-  display: flex;
-  align-items: center;
-  padding: 10px 12px;
-  border-radius: 10px;
-  margin: 8px 0;
+  gap: 10px;
+  margin-bottom: 20px;
+  padding: 10px 16px;
+  border-radius: 12px;
+  color: var(--primary);
+  font-size: 0.92rem;
+  font-weight: 600;
+  text-decoration: none;
   transition: background 0.2s ease;
 }
 
-.report-modal-content > div:not(.report-modal-actions):hover {
+.public-profile-back:hover {
   background: var(--surface-soft);
 }
 
-.report-modal-content input[type="checkbox"] {
-  display: none;
+.public-profile-back svg {
+  font-size: 0.85rem;
 }
 
-.report-modal-content label {
+/* MAIN CARD */
+
+.public-profile-card {
+  width: 100%;
+  min-width: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 28px;
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+}
+
+/* COVER BACKGROUND */
+
+.public-profile-cover {
+  position: relative;
+  height: 145px;
+  overflow: hidden;
+  background:
+    radial-gradient(
+      circle at 85% 10%,
+      rgba(255, 255, 255, 0.35),
+      transparent 35%
+    ),
+    linear-gradient(
+      120deg,
+      #ead8ca,
+      #d7b8a4
+    );
+}
+
+.public-profile-cover::before {
+  content: "";
+  position: absolute;
+  width: 360px;
+  height: 360px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.16);
+  top: -220px;
+  left: -80px;
+}
+
+.public-profile-cover::after {
+  content: "";
+  position: absolute;
+  width: 300px;
+  height: 300px;
+  border-radius: 50%;
+  background: rgba(122, 75, 58, 0.07);
+  right: -70px;
+  bottom: -220px;
+}
+
+.public-cover-globe {
+  position: absolute;
+  right: 35px;
+  top: 20px;
+  font-size: 110px;
+  color: rgba(122, 75, 58, 0.1);
+  transform: rotate(-15deg);
+}
+
+/* PROFILE HEADER */
+
+.public-profile-header {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0 28px 26px;
+  text-align: center;
+}
+
+.public-avatar-wrapper {
+  position: relative;
+  width: 132px;
+  height: 132px;
+  margin-top: -66px;
+  margin-bottom: 14px;
+  border: 5px solid var(--surface);
+  border-radius: 50%;
+  background: var(--surface-soft);
+  box-shadow: var(--shadow-soft);
+  overflow: hidden;
+}
+
+.public-profile-avatar {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  border-radius: 50%;
+}
+
+.public-profile-name {
+  margin: 0 0 6px;
+  font-size: clamp(1.65rem, 4vw, 2.15rem);
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.public-profile-location {
   display: flex;
   align-items: center;
-  cursor: pointer;
-  font-size: 0.98rem;
-  font-weight: 500;
-  color: var(--text);
+  justify-content: center;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 0.95rem;
+  overflow-wrap: anywhere;
 }
 
-.report-modal-content label::before {
-  content: "";
-  display: inline-block;
-  width: 18px;
-  height: 18px;
-  border-radius: 5px;
-  border: 2px solid var(--muted);
-  background: white;
-  margin-right: 12px;
-  transition: all 0.2s ease;
+.public-profile-location svg {
+  color: var(--primary);
   flex-shrink: 0;
 }
 
-.report-modal-content input[type="checkbox"]:checked + label::before {
-  background: var(--primary);
-  border-color: var(--primary);
-  content: "✔";
-  font-size: 12px;
-  color: white;
-  text-align: center;
-  line-height: 18px;
+/* TRAVEL STYLE */
+
+.public-travel-style {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 12px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: var(--surface-soft);
+  color: var(--primary);
+  font-size: 0.85rem;
+  font-weight: 600;
 }
 
-.report-modal-actions {
-  margin-top: 16px;
+/* CONNECT BUTTON */
+
+.public-connect-button {
   display: flex;
-  gap: 12px;
-}
-
-.report-modal-actions button {
-  flex: 1;
-  min-height: 42px;
-  padding: 10px 14px;
-  font-size: 0.95rem;
-  font-weight: 700;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  max-width: 340px;
+  min-height: 48px;
+  margin-top: 22px;
+  padding: 12px 20px;
   border: none;
+  border-radius: 14px;
+  background: var(--primary);
+  color: #ffffff;
+  font-size: 1rem;
+  font-weight: 600;
   cursor: pointer;
-  border-radius: 12px;
-  transition: background-color 0.2s ease, transform 0.2s ease;
+  transition:
+    background 0.2s ease,
+    transform 0.2s ease;
 }
 
-.report-modal-actions button:first-child {
-  background: #d8ccc4;
+.public-connect-button:hover {
+  background: var(--primary-dark);
+  transform: translateY(-2px);
+}
+
+.public-connect-button:active {
+  transform: translateY(0);
+}
+
+/* PROFILE BODY */
+
+.public-profile-body {
+  padding: 0 28px 8px;
+  border-top: 1px solid var(--border);
+}
+
+.public-profile-section {
+  padding: 22px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.public-profile-section:last-child {
+  border-bottom: none;
+}
+
+.public-profile-section h2 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 12px;
+  color: var(--text);
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.public-profile-section h2 svg {
+  color: var(--primary);
+  font-size: 0.95rem;
+  flex-shrink: 0;
+}
+
+.public-profile-section p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.95rem;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+/* INTEREST AND DESTINATION TAGS */
+
+.public-profile-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.public-profile-tag {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  padding: 7px 15px;
+  background: var(--surface-soft);
+  border: 1px solid rgba(122, 75, 58, 0.08);
+  border-radius: 999px;
+  color: var(--primary);
+  font-size: 0.87rem;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+  text-transform: capitalize;
+}
+
+/* TRAVEL DATES */
+
+.public-travel-dates {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.public-travel-dates svg {
+  color: var(--primary);
+  flex-shrink: 0;
+}
+
+/* REPORT PROFILE BUTTON */
+
+.public-report-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 16px auto 0;
+  padding: 10px 18px;
+  background: transparent;
+  border: none;
+  border-radius: 10px;
+  color: #b65b56;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.public-report-button:hover {
+  background: rgba(182, 91, 86, 0.08);
+  color: #a13e39;
+}
+
+/* LOADING AND ERROR STATES */
+
+.public-profile-status {
+  margin: 60px 0;
+  text-align: center;
+  color: var(--muted);
+  font-size: 1rem;
+}
+
+.public-profile-error {
+  color: #b42318;
+}
+
+/* ========================================
+   REPORT MODAL
+======================================== */
+
+.public-report-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(47, 36, 31, 0.48);
+  backdrop-filter: blur(5px);
+  overflow-y: auto;
+}
+
+.public-report-modal {
+  position: relative;
+  width: 100%;
+  max-width: 420px;
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+  padding: 28px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  box-shadow: var(--shadow-card);
+  animation: publicModalAppear 0.2s ease;
+}
+
+@keyframes publicModalAppear {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.public-report-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  background: var(--bg);
+  color: var(--muted);
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.public-report-close:hover {
+  background: var(--surface-soft);
+}
+
+.public-report-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  margin: 0 auto 16px;
+  border-radius: 50%;
+  background: #fbeae8;
+  color: #b65b56;
+  font-size: 1.25rem;
+}
+
+.public-report-modal h2 {
+  margin: 0 0 10px;
+  text-align: center;
+  font-size: 1.5rem;
   color: var(--text);
 }
 
-.report-modal-actions button:first-child:hover {
-  background: #cabbb1;
-  transform: translateY(-1px);
+.public-report-description {
+  margin: 0 0 22px;
+  color: var(--muted);
+  text-align: center;
+  font-size: 0.9rem;
+  line-height: 1.6;
 }
 
-.report-modal-actions button:last-child {
-  background: #d9534f;
+/* REPORT OPTIONS */
+
+.public-report-options {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.public-report-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 14px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  color: var(--text);
+  font-size: 0.92rem;
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.public-report-option:hover {
+  background: var(--surface-soft);
+}
+
+.public-report-option.selected {
+  background: var(--surface-soft);
+  border-color: var(--primary);
+}
+
+.public-report-option input {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--primary);
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.public-report-error {
+  margin: 12px 0 0;
+  color: #b42318;
+  font-size: 0.85rem;
+}
+
+/* REPORT MODAL BUTTONS */
+
+.public-report-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 22px;
+}
+
+.public-report-cancel,
+.public-report-submit {
+  min-height: 44px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.public-report-cancel {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+}
+
+.public-report-cancel:hover {
+  background: var(--surface-soft);
+}
+
+.public-report-submit {
+  background: #b94c47;
   color: white;
 }
 
-.report-modal-actions button:last-child:hover {
-  background: #c9302c;
-  transform: translateY(-1px);
+.public-report-submit:hover {
+  background: #a13e39;
 }
 
+.public-report-modal button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* KEYBOARD ACCESSIBILITY */
+
+.public-profile-inner button:focus-visible,
+.public-profile-inner a:focus-visible,
+.public-profile-inner input:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 3px;
+}
+
+/* ========================================
+   TABLET
+======================================== */
+
+@media (max-width: 900px) {
+  .public-profile-inner {
+    max-width: 600px;
+  }
+}
+
+/* ========================================
+   MOBILE
+======================================== */
+
 @media (max-width: 640px) {
-  .report-modal-content {
-    padding: 18px;
-    border-radius: 18px;
+  .public-profile-inner {
+    padding: 0 0 16px;
   }
 
-  .report-modal-actions {
-    flex-direction: column;
+  .public-profile-back {
+    margin-bottom: 12px;
+    padding: 10px 6px;
+    font-size: 0.85rem;
+  }
+
+  .public-profile-card {
+    border-radius: 22px;
+  }
+
+  .public-profile-cover {
+    height: 115px;
+  }
+
+  .public-cover-globe {
+    font-size: 85px;
+    right: 20px;
+    top: 15px;
+  }
+
+  .public-avatar-wrapper {
+    width: 112px;
+    height: 112px;
+    margin-top: -56px;
+    border-width: 4px;
+  }
+
+  .public-profile-header {
+    padding: 0 18px 22px;
+  }
+
+  .public-profile-name {
+    font-size: 1.7rem;
+  }
+
+  .public-profile-location {
+    font-size: 0.88rem;
+  }
+
+  .public-connect-button {
+    max-width: 100%;
+    margin-top: 18px;
+  }
+
+  .public-profile-body {
+    padding: 0 18px 4px;
+  }
+
+  .public-profile-section {
+    padding: 18px 0;
+  }
+
+  .public-profile-section h2 {
+    font-size: 1rem;
+  }
+
+  .public-profile-section p {
+    font-size: 0.9rem;
+  }
+
+  .public-profile-tag {
+    padding: 6px 12px;
+    font-size: 0.82rem;
+  }
+
+  .public-travel-dates {
+    padding: 12px;
+    font-size: 0.85rem;
+  }
+
+  .public-report-modal {
+    padding: 22px 18px;
+    border-radius: 20px;
+  }
+}
+
+/* EXTRA SMALL PHONES */
+
+@media (max-width: 360px) {
+  .public-profile-body {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+
+  .public-profile-header {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+
+  .public-report-actions {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* REDUCED MOTION */
+
+@media (prefers-reduced-motion: reduce) {
+  .public-profile-inner *,
+  .public-profile-inner *::before,
+  .public-profile-inner *::after {
+    animation: none !important;
+    transition: none !important;
   }
 }

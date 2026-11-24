@@ -1,35 +1,91 @@
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import {
-  FaChevronLeft,
-  FaChevronRight,
+  FaSearch,
   FaCalendarAlt,
   FaUsers,
   FaMapMarkerAlt,
+  FaArrowRight,
+  FaCompass,
+  FaMusic,
+  FaMountain,
+  FaGlassCheers,
+  FaChalkboardTeacher,
+  FaBriefcase,
+  FaTimes,
 } from "react-icons/fa";
 
 import "../styles/ExploreEvents.css";
 import API_BASE_URL from "../config/api";
 import AppShell from "../components/AppShell";
 
+const categories = [
+  { label: "All events", value: "", icon: FaCompass },
+  { label: "Concerts", value: "concert", icon: FaMusic },
+  { label: "Adventure", value: "adventure", icon: FaMountain },
+  { label: "Parties", value: "party", icon: FaGlassCheers },
+  { label: "Workshops", value: "workshop", icon: FaChalkboardTeacher },
+  { label: "Conferences", value: "conference", icon: FaBriefcase },
+];
+
+function EventImage({ event }) {
+  const [failed, setFailed] = useState(false);
+
+  const category = categories.find(
+    (item) =>
+      item.value &&
+      event.type?.toLowerCase().includes(item.value)
+  );
+
+  const Icon = category?.icon || FaCompass;
+
+  return (
+    <div className="explore-card-media">
+      {event.image && !failed ? (
+        <img
+          src={event.image}
+          alt={event.name}
+          loading="lazy"
+          onError={() => setFailed(true)}
+        />
+      ) : (
+        <div className="explore-image-fallback">
+          <Icon />
+          <span>{event.type || "Experience"}</span>
+        </div>
+      )}
+
+      <span className="explore-card-category">
+        {event.type || "Experience"}
+      </span>
+    </div>
+  );
+}
+
 function ExploreEvents() {
   const [events, setEvents] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchDate, setSearchDate] = useState("");
   const [searchType, setSearchType] = useState("");
-  const [currentPage, setCurrentPage] = useState(1);
-
-  const eventsPerPage = 3;
+  const [visibleCount, setVisibleCount] = useState(6);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     const fetchEvents = async () => {
       try {
         const response = await fetch(`${API_BASE_URL}/event`);
+
+        if (!response.ok) {
+          throw new Error("Failed to load events.");
+        }
+
         const data = await response.json();
         setEvents(Array.isArray(data) ? data : []);
-      } catch (error) {
-        console.error("Failed to fetch events:", error);
-        setEvents([]);
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
       }
     };
 
@@ -37,128 +93,230 @@ function ExploreEvents() {
   }, []);
 
   useEffect(() => {
-    setCurrentPage(1);
+    setVisibleCount(6);
   }, [searchQuery, searchDate, searchType]);
 
+  const clearFilters = () => {
+    setSearchQuery("");
+    setSearchDate("");
+    setSearchType("");
+    setVisibleCount(6);
+  };
+
   const filteredEvents = events.filter((event) => {
-    const matchesDestination = event.destination
-      ?.toLowerCase()
-      .includes(searchQuery.toLowerCase());
+    const query = searchQuery.trim().toLowerCase();
 
-    const matchesDate = searchDate
-      ? new Date(event.startDate).toLocaleDateString() ===
-        new Date(searchDate).toLocaleDateString()
-      : true;
+    const matchesSearch =
+      `${event.destination || ""} ${event.name || ""}`
+        .toLowerCase()
+        .includes(query);
 
-    const matchesType = searchType
-      ? event.type?.toLowerCase().includes(searchType.toLowerCase())
-      : true;
+    const matchesDate =
+      !searchDate ||
+      String(event.startDate || "").slice(0, 10) === searchDate;
 
-    return matchesDestination && matchesDate && matchesType;
+    const matchesType =
+      !searchType ||
+      (event.type || "").toLowerCase().includes(searchType);
+
+    return matchesSearch && matchesDate && matchesType;
   });
 
-  const totalPages = Math.max(1, Math.ceil(filteredEvents.length / eventsPerPage));
+  const visibleEvents = filteredEvents.slice(0, visibleCount);
 
-  const currentEvents = filteredEvents.slice(
-    (currentPage - 1) * eventsPerPage,
-    currentPage * eventsPerPage
-  );
+  const hasFilters = searchQuery || searchDate || searchType;
 
   return (
-    <AppShell className="event-container">
-      <div className="app-page explore-page-inner">
-        <h2 className="event-title">Explore Events</h2>
+    <AppShell className="explore-shell">
+      <div className="explore-page-inner">
 
-        <div className="search-container">
-          <input
-            className="search-input"
-            type="text"
-            placeholder="Search by destination"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
+        <header className="explore-heading">
+          <span className="explore-eyebrow">
+            DISCOVER SOMETHING NEW
+          </span>
 
-          <input
-            className="search-input"
-            type="date"
-            value={searchDate}
-            onChange={(e) => setSearchDate(e.target.value)}
-          />
+          <h1>Explore the world.</h1>
 
-          <select
-            className="search-input"
-            value={searchType}
-            onChange={(e) => setSearchType(e.target.value)}
-          >
-            <option value="">All event types</option>
-            <option value="concert">Concert</option>
-            <option value="adventure">Adventure</option>
-            <option value="conference">Conference</option>
-            <option value="workshop">Workshop</option>
-            <option value="party">Party</option>
-          </select>
-        </div>
+          <p>
+            Discover experiences, meet new people,
+            and make unforgettable memories.
+          </p>
+        </header>
 
-        <div className="event-list">
-          {currentEvents.length > 0 ? (
-            currentEvents.map((event) => (
-              <div className="event-card" key={event._id}>
-                <img
-                  className="event-image"
-                  src={event.image}
-                  alt={event.name}
-                />
+        <div className="explore-search-panel">
+          <div className="explore-search-field">
+            <FaSearch />
 
-                <h3>{event.name}</h3>
+            <div className="explore-field-content">
+              <label htmlFor="explore-destination">
+                Where to?
+              </label>
 
-                <div className="event-details">
-                  <FaMapMarkerAlt className="event-icon" />
-                  <p>{event.destination}</p>
-                </div>
+              <input
+                id="explore-destination"
+                type="search"
+                placeholder="Search destinations or events"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+          </div>
 
-                <div className="event-details">
-                  <FaCalendarAlt className="event-icon" />
-                  <p>
-                    {new Date(event.startDate).toLocaleDateString("en-US", {
-                      timeZone: "UTC",
-                    })}
-                  </p>
-                </div>
+          <div className="explore-date-field">
+            <FaCalendarAlt />
 
-                <div className="event-details">
-                  <FaUsers className="event-icon" />
-                  <p>{event.attendees} attendees</p>
-                </div>
+            <div className="explore-field-content">
+              <label htmlFor="explore-date">
+                When?
+              </label>
 
-                <Link to={`/events/${event._id}`} style={{ textDecoration: "none" }}>
-                  <button className="view-details-button">View Details</button>
-                </Link>
-              </div>
-            ))
-          ) : (
-            <p className="no-events-text">No events found.</p>
+              <input
+                id="explore-date"
+                type="date"
+                value={searchDate}
+                onChange={(e) => setSearchDate(e.target.value)}
+              />
+            </div>
+          </div>
+
+          {hasFilters && (
+            <button
+              type="button"
+              className="explore-clear-button"
+              onClick={clearFilters}
+              aria-label="Clear all filters"
+            >
+              <FaTimes />
+            </button>
           )}
         </div>
 
-        <div className="pagination">
-          <button
-            onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-            disabled={currentPage === 1}
-          >
-            <FaChevronLeft />
-          </button>
-
-          <span>
-            {currentPage} of {totalPages}
-          </span>
-
-          <button
-            onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-            disabled={currentPage === totalPages}
-          >
-            <FaChevronRight />
-          </button>
+        <div className="explore-categories">
+          {categories.map(({ label, value, icon: Icon }) => (
+            <button
+              key={label}
+              type="button"
+              className={`explore-category ${
+                searchType === value ? "active" : ""
+              }`}
+              onClick={() => setSearchType(value)}
+              aria-pressed={searchType === value}
+            >
+              <Icon />
+              <span>{label}</span>
+            </button>
+          ))}
         </div>
+
+        <div className="explore-results-heading">
+          <h2>Discover experiences</h2>
+
+          {!loading && !error && (
+            <span>
+              {filteredEvents.length}{" "}
+              {filteredEvents.length === 1 ? "event" : "events"}
+            </span>
+          )}
+        </div>
+
+        {loading ? (
+          <div className="explore-empty-state">
+            <FaCompass />
+            <h3>Finding experiences...</h3>
+          </div>
+        ) : error ? (
+          <div className="explore-empty-state">
+            <h3>Something went wrong</h3>
+            <p>{error}</p>
+          </div>
+        ) : visibleEvents.length === 0 ? (
+          <div className="explore-empty-state">
+            <FaCompass />
+
+            <h3>No experiences found</h3>
+
+            <p>Try another destination or change your filters.</p>
+
+            {hasFilters && (
+              <button onClick={clearFilters}>
+                Clear filters
+              </button>
+            )}
+          </div>
+        ) : (
+          <div className="explore-event-grid">
+            {visibleEvents.map((event) => (
+              <article
+                className="explore-event-card"
+                key={event._id}
+              >
+                <Link
+                  to={`/events/${event._id}`}
+                  className="explore-image-link"
+                >
+                  <EventImage event={event} />
+                </Link>
+
+                <div className="explore-card-body">
+                  <h3>{event.name}</h3>
+
+                  <div className="explore-event-meta">
+                    <FaMapMarkerAlt />
+                    <span>
+                      {event.destination || "Location not specified"}
+                    </span>
+                  </div>
+
+                  <div className="explore-event-meta">
+                    <FaCalendarAlt />
+
+                    <span>
+                      {event.startDate
+                        ? new Date(event.startDate).toLocaleDateString(
+                            "en-US",
+                            {
+                              month: "short",
+                              day: "numeric",
+                              year: "numeric",
+                              timeZone: "UTC",
+                            }
+                          )
+                        : "Date to be announced"}
+                    </span>
+                  </div>
+
+                  <div className="explore-card-footer">
+                    <div className="explore-attendees">
+                      <FaUsers />
+                      <span>{event.attendees ?? 0} attendees</span>
+                    </div>
+
+                    <Link
+                      to={`/events/${event._id}`}
+                      className="explore-details-link"
+                    >
+                      Explore
+                      <FaArrowRight />
+                    </Link>
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
+
+        {!loading &&
+          !error &&
+          visibleCount < filteredEvents.length && (
+            <div className="explore-load-more">
+              <button
+                onClick={() => setVisibleCount((prev) => prev + 6)}
+              >
+                Load more experiences
+              </button>
+            </div>
+          )}
+
       </div>
     </AppShell>
   );

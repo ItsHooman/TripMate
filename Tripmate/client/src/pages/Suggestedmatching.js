@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { useContext } from "react";
 import { AuthContext } from "../context/AuthContext";
 import "../styles/Suggestedmatching.css"; 
-import Navbar from "../components/Navbar";
+import AppShell from "../components/AppShell";
 
 const MatchingPage = () => {
   const [matches, setMatches] = useState([]);
@@ -57,8 +57,8 @@ const MatchingPage = () => {
   }
 
   return (
+  <AppShell>
     <section className="matching-section">
-        <Navbar />
       <h2 className="matching-title">Suggested Matched Users</h2>
           {/* Check if the user has completed their profile */}
           {!currentUser || !currentUser.name || currentUser.interests.length === 0 || currentUser.preferredDestinations.length === 0 ? (
@@ -102,7 +102,8 @@ const MatchingPage = () => {
               <p className="no-matches-text">No matches found.</p>
             )
           )}
-    </section>
+        </section>
+  </AppShell>
   );
 };
 

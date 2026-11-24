@@ -1,7 +1,7 @@
 import React, { useContext, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext";
-
+import TripMateLogo from "./TripMateLogo";
 
 function Navbar() {
   const { logout } = useContext(AuthContext);
@@ -18,13 +18,7 @@ function Navbar() {
       <div className="app-shell">
         <nav className="app-navbar">
           <div className="app-navbar-left">
-            <NavLink to="/matching" className="app-logo">
-              <img
-                src="/logo-1-Photoroom.png"
-                alt="TripMate Logo"
-                className="app-logo-image"
-              />
-            </NavLink>
+            <TripMateLogo />
           </div>
 
           <button
