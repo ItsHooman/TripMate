@@ -4,6 +4,7 @@ const mongoose = require('mongoose');
 const authenticate = require('../middleware/auth');
 const User = require('../models/User');
 const Profile = require('../models/Profile');
+const TravelMatch = require("../models/TravelMatch");
 
 const {
     calculateCompatibility,
@@ -18,6 +19,24 @@ const PUBLIC_PROFILE_FIELDS =
 
 // Build ranked recommendations
 async function getRecommendations(userId) {
+    const previousSwipes = await TravelMatch.find({
+    $or: [
+        {
+            userA: userId,
+            decisionA: { $in: ["like", "pass"] }
+        },
+        {
+            userB: userId,
+            decisionB: { $in: ["like", "pass"] }
+        }
+    ]
+}).lean();
+
+const excludedUserIds = previousSwipes.map((swipe) =>
+    String(swipe.userA) === String(userId)
+        ? swipe.userB
+        : swipe.userA
+);
     const currentUser = await User.findById(userId)
         .select('profile contacts status isActive isBanned')
         .populate('profile')
@@ -60,14 +79,18 @@ async function getRecommendations(userId) {
     ];
 
     const users = await User.find({
-        _id: { $nin: excludedIds },
-        role: { $ne: 'admin' },
-        status: { $ne: 'banned' },
-        isBanned: { $ne: true },
-        isActive: { $ne: false },
-    })
-        .select('_id name role')
-        .lean();
+            _id: {
+                $nin: [userId, ...excludedUserIds]
+            },
+            role: { $ne: "admin" },
+            isBanned: { $ne: true },
+            isActive: { $ne: false }
+        })
+        .select("-password -email")
+        .populate({
+            path: "profile",
+            select: "-email"
+        });
 
     const profiles = await Profile.find({
         user: { $in: users.map(user => user._id) },

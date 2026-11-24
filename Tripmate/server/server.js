@@ -21,6 +21,7 @@ const reportRoutes = require('./routes/reportRoutes');
 const NotificationRoutes = require('./routes/notificationRoutes');
 const checkBan = require('./routes/checkban');
 const messageRoutes = require('./routes/messages');
+const swipeRoutes = require("./routes/swipes");
 
 
 // Middleware
@@ -38,6 +39,7 @@ app.use('/api/users', usersRoutes);
 app.use('/api', checkBan);
 app.use('/api/notifications', NotificationRoutes);
 app.use('/api/reports', reportRoutes);
+app.use("/api/swipes", swipeRoutes);
 
 // Serve static assets if in production
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
@@ -49,6 +51,7 @@ const io = require('socket.io')(server, {
         methods: ["GET", "POST"],
     },
 });
+app.set("io", io);
 
 
 // MongoDB Connection

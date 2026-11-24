@@ -23,6 +23,7 @@ import "../styles/MessagePage.css";
 import { AuthContext } from "../context/AuthContext";
 import AppShell from "../components/AppShell";
 import API_BASE_URL from "../config/api";
+import TripMatchModal from "../components/TripMatchModal";
 
 const SOCKET_SERVER_URL =
   process.env.REACT_APP_SOCKET_URL || "http://localhost:5002";

@@ -1,4 +1,3 @@
-
 import React, {
   useContext,
   useEffect,
@@ -25,6 +24,7 @@ import {
 } from "react-icons/fa";
 
 import AppShell from "../components/AppShell";
+import TripMatchModal from "../components/TripMatchModal";
 import { AuthContext } from "../context/AuthContext";
 import API_BASE_URL from "../config/api";
 import "../styles/MatchingPage.css";
@@ -139,6 +139,10 @@ function CompatibilityRing({ score }) {
 /* MAIN MATCHING PAGE */
 
 function MatchingPage() {
+
+  const [matchedUser, setMatchedUser] = useState(null);
+  const swipeRequest = useRef(null);
+
   const { user } = useContext(AuthContext);
   const navigate = useNavigate();
 
@@ -276,12 +280,18 @@ function MatchingPage() {
       openConnection(id, name);
     };
 
+    const handleNewMatch = (data) => {
+      if (data?.user) setMatchedUser(data.user);
+    };
+
+    newSocket.on("newMatch", handleNewMatch);
     newSocket.on("connect", handleConnect);
     newSocket.on("disconnect", handleDisconnect);
     newSocket.on("connectionAccepted", handleAccepted);
     newSocket.on("connectionConfirmed", handleConfirmed);
 
     return () => {
+      newSocket.off("newMatch", handleNewMatch);
       newSocket.off("connect", handleConnect);
       newSocket.off("disconnect", handleDisconnect);
       newSocket.off("connectionAccepted", handleAccepted);
@@ -386,30 +396,60 @@ function MatchingPage() {
 
   /* SWIPE ACTIONS */
 
+  
   const handleSwipe = (direction, match) => {
+    if (!["left", "right"].includes(direction) || !match?._id) return;
+    if (swipeRequest.current) return;
+
     swipeLock.current = true;
     setIsSwiping(true);
     setSwipeDirection(direction);
 
-    if (direction === "right") {
-      const likedUsers = readStorage("likedUsers");
+    swipeRequest.current = (async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/swipes`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+          body: JSON.stringify({
+            targetUserId: match._id,
+            action: direction === "right" ? "like" : "pass",
+          }),
+        });
 
-      if (
-        !likedUsers.some(
-          (item) => String(item._id) === String(match._id)
-        )
-      ) {
-        localStorage.setItem(
-          "likedUsers",
-          JSON.stringify([...likedUsers, match])
-        );
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.message || "Unable to save swipe.");
+        }
+
+        return { saved: true, matchedUser: data.isMatched ? data.user : null };
+      } catch (err) {
+        console.error("Swipe error:", err);
+        return { saved: false };
       }
-    }
+    })();
   };
 
-  const handleCardLeftScreen = () => {
-    // Move from highest compatibility to lowest.
-    setCurrentIndex((previous) => previous + 1);
+  const handleCardLeftScreen = async () => {
+    const request = swipeRequest.current;
+    if (!request) return;
+
+    const result = await request;
+    if (swipeRequest.current !== request) return;
+
+    swipeRequest.current = null;
+    swipeLock.current = false;
+    setIsSwiping(false);
+    setSwipeDirection("");
+
+    if (result.saved) {
+      setCurrentIndex((previous) => previous + 1);
+      if (result.matchedUser) setMatchedUser(result.matchedUser);
+    } else {
+      setError("We couldn't confirm your swipe. Refresh your recommendations to try again.");
+    }
   };
 
   const swipe = async (direction) => {
@@ -454,6 +494,29 @@ function MatchingPage() {
     setActionMessage(
       "Connection requested. You can keep discovering travelers."
     );
+  };
+
+  const handleMatchMessage = (traveler) => {
+    if (!traveler?._id) return;
+
+    const connectedUsers = readStorage("connectedUsers");
+    const updatedUsers = [
+      ...connectedUsers.filter(
+        (item) => String(item._id) !== String(traveler._id)
+      ),
+      traveler,
+    ];
+
+    localStorage.setItem("connectedUsers", JSON.stringify(updatedUsers));
+    setMatchedUser(null);
+
+    navigate("/messages", {
+      state: {
+        currentUserId,
+        connectedUsers: updatedUsers,
+        selectedUser: traveler,
+      },
+    });
   };
 
   const restartDiscovery = () => {
@@ -1009,6 +1072,12 @@ function MatchingPage() {
           </div>
         )}
       </div>
+      <TripMatchModal
+        currentUser={user}
+        matchedUser={matchedUser}
+        onClose={() => setMatchedUser(null)}
+        onMessage={handleMatchMessage}
+      />
     </AppShell>
   );
 }
