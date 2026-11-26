@@ -189,3 +189,121 @@
     padding: 12px 8px;
   }
 }
+
+/* ========================================
+   GLOBAL NOTIFICATION CONTROLS
+======================================== */
+
+.app-shell-header-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 20px;
+}
+
+.app-shell-notification-button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+
+  width: 42px;
+  height: 42px;
+
+  border: 1px solid var(--border);
+  border-radius: 14px;
+
+  background: var(--surface-soft);
+  color: var(--primary);
+
+  text-decoration: none;
+
+  transition:
+    background 0.2s ease,
+    color 0.2s ease,
+    transform 0.2s ease;
+}
+
+.app-shell-notification-button svg {
+  width: 21px;
+  height: 21px;
+}
+
+.app-shell-notification-button:hover,
+.app-shell-notification-button.active {
+  background: var(--primary);
+  color: white;
+}
+
+.app-shell-notification-button:active {
+  transform: scale(0.95);
+}
+
+/* ========================================
+   UNREAD BADGES
+======================================== */
+
+.bottom-nav-icon-wrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tripmate-unread-badge {
+  position: absolute;
+  top: -7px;
+  right: -11px;
+
+  min-width: 19px;
+  height: 19px;
+  padding: 0 5px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  background: #c65353;
+  color: #ffffff;
+
+  border: 2px solid var(--surface, #ffffff);
+  border-radius: 999px;
+
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+
+  pointer-events: none;
+  box-sizing: border-box;
+}
+
+.app-shell-notification-button
+.tripmate-unread-badge {
+  top: -5px;
+  right: -5px;
+}
+
+@media (max-width: 640px) {
+  .app-shell-header-actions {
+    gap: 10px;
+  }
+
+  .app-shell-notification-button {
+    width: 38px;
+    height: 38px;
+    border-radius: 12px;
+  }
+
+  .app-shell-notification-button svg {
+    width: 19px;
+    height: 19px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-shell-notification-button {
+    transition: none;
+  }
+}

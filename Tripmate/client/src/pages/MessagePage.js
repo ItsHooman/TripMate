@@ -4,6 +4,7 @@ import React, {
   useEffect,
   useContext,
   useRef,
+  useCallback,
 } from "react";
 
 import { useLocation, Link } from "react-router-dom";
@@ -23,22 +24,68 @@ import "../styles/MessagePage.css";
 import { AuthContext } from "../context/AuthContext";
 import AppShell from "../components/AppShell";
 import API_BASE_URL from "../config/api";
-import TripMatchModal from "../components/TripMatchModal";
 
 const SOCKET_SERVER_URL =
-  process.env.REACT_APP_SOCKET_URL || "http://localhost:5002";
+  process.env.REACT_APP_SOCKET_URL ||
+  "http://localhost:5002";
+
+/* HELPERS */
 
 const getName = (user) =>
-  user?.profile?.name || user?.name || "Unknown User";
+  user?.profile?.name ||
+  user?.name ||
+  "Traveler";
 
 const getId = (user) =>
   String(user?._id || user?.id || "");
 
+const getImageUrl = (image) => {
+  if (!image) return "";
+
+  if (image.startsWith("/uploads/")) {
+    return `${API_BASE_URL.replace(/\/api\/?$/, "")}${image}`;
+  }
+
+  return image;
+};
+
+async function apiRequest(endpoint, options = {}) {
+  const token = localStorage.getItem("token");
+
+  const response = await fetch(
+    `${API_BASE_URL}${endpoint}`,
+    {
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...options.headers,
+        Authorization: `Bearer ${token}`,
+      },
+    }
+  );
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(
+      data.message ||
+      data.error ||
+      "Something went wrong."
+    );
+  }
+
+  return data;
+}
+
+/* USER AVATAR */
+
 function UserAvatar({ user }) {
   const [imageFailed, setImageFailed] = useState(false);
 
-  const image =
-    user?.profile?.profilePicture || user?.profilePicture;
+  const image = getImageUrl(
+    user?.profile?.profilePicture ||
+    user?.profilePicture
+  );
 
   const initials = getName(user)
     .trim()
@@ -67,73 +114,88 @@ function UserAvatar({ user }) {
   );
 }
 
+/* PREVENT DUPLICATE MESSAGES */
+
 function mergeMessages(previous, incoming) {
   const unique = new Map();
 
-  [...previous, ...incoming].forEach((msg) => {
-    const key = JSON.stringify([
-      msg.senderId,
-      msg.recipientId,
-      msg.timestamp,
-      msg.message,
-    ]);
+  [...previous, ...incoming].forEach((message) => {
+    const key =
+      message._id ||
+      JSON.stringify([
+        message.senderId,
+        message.recipientId,
+        message.timestamp,
+        message.message,
+      ]);
 
-    unique.set(key, msg);
+    unique.set(String(key), message);
   });
 
   return [...unique.values()].sort(
-    (a, b) => new Date(a.timestamp) - new Date(b.timestamp)
+    (a, b) =>
+      new Date(a.timestamp) -
+      new Date(b.timestamp)
   );
 }
 
+/* MAIN PAGE */
+
 function MessagesPage() {
   const location = useLocation();
-  const { user } = useContext(AuthContext);
 
-  const currentUserId = String(
-    user?.id ||
-      user?._id ||
-      location.state?.currentUserId ||
-      localStorage.getItem("currentUserId") ||
-      ""
-  );
+  const { user, authLoading } =
+    useContext(AuthContext);
 
-  const [connectedUsers, setConnectedUsers] = useState(() => {
-    try {
-      const users =
-        location.state?.connectedUsers ||
-        JSON.parse(localStorage.getItem("connectedUsers")) ||
-        [];
+  const currentUserId = getId(user);
 
-      return Array.isArray(users) ? users : [];
-    } catch {
-      return [];
-    }
-  });
+  const [connectedUsers, setConnectedUsers] =
+    useState([]);
 
-  const [selectedUser, setSelectedUser] = useState(
-    location.state?.selectedUser || null
-  );
+  const [selectedUser, setSelectedUser] =
+    useState(null);
 
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
-  const [unreadMessages, setUnreadMessages] = useState({});
+
+  const [unreadMessages, setUnreadMessages] =
+    useState({});
+
   const [socket, setSocket] = useState(null);
   const [isConnected, setIsConnected] = useState(false);
-  const [loadingMessages, setLoadingMessages] = useState(false);
-  const [messageError, setMessageError] = useState("");
-  const [menuOpen, setMenuOpen] = useState(false);
 
-  const [mobileChatOpen, setMobileChatOpen] = useState(
-    Boolean(location.state?.selectedUser)
-  );
+  const [loadingConnections, setLoadingConnections] =
+    useState(true);
+
+  const [loadingMessages, setLoadingMessages] =
+    useState(false);
+
+  const [connectionError, setConnectionError] =
+    useState("");
+
+  const [messageError, setMessageError] =
+    useState("");
+
+  const [sendError, setSendError] = useState("");
+  const [sending, setSending] = useState(false);
+  const [disconnecting, setDisconnecting] = useState(false);
+
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [mobileChatOpen, setMobileChatOpen] =
+    useState(false);
 
   const messagesEndRef = useRef(null);
-  const selectedUserRef = useRef(selectedUser);
+  const selectedUserRef = useRef(null);
   const inputRef = useRef(null);
+  const connectionsRequestRef = useRef(0);
+  const sendingRef = useRef(false);
 
   const selectedUserId = getId(selectedUser);
+
+  const requestedUserId = getId(
+    location.state?.selectedUser
+  );
 
   const connections = connectedUsers.filter(
     (connection) =>
@@ -141,115 +203,280 @@ function MessagesPage() {
       getId(connection) !== currentUserId
   );
 
-  const filteredUsers = connections.filter((connection) =>
-    getName(connection)
-      .toLowerCase()
-      .includes(searchQuery.trim().toLowerCase())
+  const filteredUsers = connections.filter(
+    (connection) =>
+      getName(connection)
+        .toLowerCase()
+        .includes(searchQuery.trim().toLowerCase())
   );
 
-  // Store connections locally.
+  /* CLEAR ACTIVE CONVERSATION */
+
+  const clearConversation = useCallback(() => {
+    selectedUserRef.current = null;
+
+    setSelectedUser(null);
+    setMessages([]);
+    setNewMessage("");
+    setMessageError("");
+    setSendError("");
+    setMenuOpen(false);
+    setMobileChatOpen(false);
+  }, []);
+
+  /* SELECT CONVERSATION */
+
+  const handleSelectUser = useCallback((connection) => {
+    if (
+      getId(connection) !==
+      getId(selectedUserRef.current)
+    ) {
+      setMessages([]);
+      setNewMessage("");
+      setMessageError("");
+      setSendError("");
+    }
+
+    selectedUserRef.current = connection;
+
+    setSelectedUser(connection);
+    setMobileChatOpen(true);
+    setMenuOpen(false);
+
+    setUnreadMessages((previous) => ({
+      ...previous,
+      [getId(connection)]: 0,
+    }));
+  }, []);
+
+  /* FETCH PERSISTENT CONNECTIONS */
+
+  const fetchConnections = useCallback(async () => {
+    if (!currentUserId) return;
+
+    const requestId =
+      ++connectionsRequestRef.current;
+
+    try {
+      const data = await apiRequest(
+        "/message/connections"
+      );
+
+      if (
+        requestId !== connectionsRequestRef.current
+      ) {
+        return;
+      }
+
+      const users = Array.isArray(data)
+        ? data
+        : [];
+
+      setConnectedUsers(users);
+      setConnectionError("");
+
+      const activeId = getId(
+        selectedUserRef.current
+      );
+
+      if (
+        activeId &&
+        !users.some(
+          (connection) =>
+            getId(connection) === activeId
+        )
+      ) {
+        clearConversation();
+      }
+    } catch (error) {
+      if (
+        requestId === connectionsRequestRef.current
+      ) {
+        setConnectionError(error.message);
+      }
+    } finally {
+      if (
+        requestId === connectionsRequestRef.current
+      ) {
+        setLoadingConnections(false);
+      }
+    }
+  }, [currentUserId, clearConversation]);
+
+  /* INITIAL LOAD */
 
   useEffect(() => {
-    localStorage.setItem(
-      "connectedUsers",
-      JSON.stringify(connectedUsers)
+    if (!currentUserId || authLoading) return;
+
+    clearConversation();
+    setConnectedUsers([]);
+    setUnreadMessages({});
+    setLoadingConnections(true);
+
+    fetchConnections();
+
+    return () => {
+      connectionsRequestRef.current += 1;
+    };
+  }, [
+    currentUserId,
+    authLoading,
+    fetchConnections,
+    clearConversation,
+  ]);
+
+  /* OPEN MATCH FROM NAVIGATION */
+
+  useEffect(() => {
+    if (!requestedUserId) return;
+
+    const requestedUser = connectedUsers.find(
+      (connection) =>
+        getId(connection) === requestedUserId
     );
-  }, [connectedUsers]);
+
+    if (
+      requestedUser &&
+      !selectedUserRef.current
+    ) {
+      handleSelectUser(requestedUser);
+    }
+  }, [
+    requestedUserId,
+    connectedUsers,
+    handleSelectUser,
+  ]);
+
+  /* AUTHENTICATED SOCKET */
 
   useEffect(() => {
-    if (currentUserId) {
-      localStorage.setItem("currentUserId", currentUserId);
-    }
-  }, [currentUserId]);
+    if (!currentUserId || authLoading) return;
 
-  useEffect(() => {
-    if (Array.isArray(location.state?.connectedUsers)) {
-      setConnectedUsers(location.state.connectedUsers);
-    }
+    const token = localStorage.getItem("token");
 
-    if (location.state?.selectedUser) {
-      selectedUserRef.current = location.state.selectedUser;
-      setSelectedUser(location.state.selectedUser);
-      setMobileChatOpen(true);
-    }
-  }, [location.state]);
-
-  // Establish the Socket.IO connection.
-
-  useEffect(() => {
     const newSocket = io(SOCKET_SERVER_URL, {
       transports: ["websocket"],
+      auth: { token },
     });
 
     const handleConnect = () => {
       setIsConnected(true);
-
-      if (currentUserId) {
-        newSocket.emit("joinRoom", currentUserId);
-      }
+      setConnectionError("");
+      fetchConnections();
     };
 
     const handleDisconnect = () => {
       setIsConnected(false);
     };
 
-    newSocket.on("connect", handleConnect);
-    newSocket.on("disconnect", handleDisconnect);
-
-    setSocket(newSocket);
-
-    return () => {
-      newSocket.off("connect", handleConnect);
-      newSocket.off("disconnect", handleDisconnect);
-      newSocket.disconnect();
+    const handleConnectError = (error) => {
+      setIsConnected(false);
+      setConnectionError(error.message);
     };
-  }, [currentUserId]);
-
-  // Receive real-time messages.
-
-  useEffect(() => {
-    if (!socket || !currentUserId) return;
 
     const handleMessage = (data) => {
-      if (!data?.message || !data?.timestamp) return;
+      if (!data?.message || !data?.timestamp) {
+        return;
+      }
 
-      const senderId = String(data.senderId || "");
-      const recipientId = String(data.recipientId || "");
+      const senderId = String(data.senderId);
+      const recipientId = String(data.recipientId);
 
-      const activeUserId = getId(selectedUserRef.current);
+      const activeId = getId(
+        selectedUserRef.current
+      );
 
-      const isSentByMe = senderId === currentUserId;
-      const isReceivedByMe = recipientId === currentUserId;
+      const isSentByMe =
+        senderId === currentUserId;
 
-      if (!isSentByMe && !isReceivedByMe) return;
+      const isReceivedByMe =
+        recipientId === currentUserId;
+
+      if (!isSentByMe && !isReceivedByMe) {
+        return;
+      }
 
       const belongsToConversation =
-        (isSentByMe && recipientId === activeUserId) ||
-        (isReceivedByMe && senderId === activeUserId);
+        (isSentByMe && recipientId === activeId) ||
+        (isReceivedByMe && senderId === activeId);
 
       if (belongsToConversation) {
         setMessages((previous) =>
           mergeMessages(previous, [data])
         );
-      } else if (isReceivedByMe && !isSentByMe) {
+      } else if (isReceivedByMe) {
         setUnreadMessages((previous) => ({
           ...previous,
-          [senderId]: (previous[senderId] || 0) + 1,
+          [senderId]:
+            (previous[senderId] || 0) + 1,
         }));
       }
     };
 
-    socket.on("receiveMessage", handleMessage);
+    const handleConnectionRemoved = (data) => {
+      const removedId = String(
+        data?.userId || ""
+      );
+
+      setConnectedUsers((previous) =>
+        previous.filter(
+          (connection) =>
+            getId(connection) !== removedId
+        )
+      );
+
+      if (
+        getId(selectedUserRef.current) === removedId
+      ) {
+        clearConversation();
+      }
+
+      fetchConnections();
+    };
+
+    newSocket.on("connect", handleConnect);
+    newSocket.on("disconnect", handleDisconnect);
+    newSocket.on("connect_error", handleConnectError);
+
+    newSocket.on(
+      "receiveMessage",
+      handleMessage
+    );
+
+    newSocket.on(
+      "newMatch",
+      fetchConnections
+    );
+
+    newSocket.on(
+      "connectionAccepted",
+      fetchConnections
+    );
+
+    newSocket.on(
+      "connectionRemoved",
+      handleConnectionRemoved
+    );
+
+    setSocket(newSocket);
 
     return () => {
-      socket.off("receiveMessage", handleMessage);
+      newSocket.removeAllListeners();
+      newSocket.disconnect();
     };
-  }, [socket, currentUserId]);
+  }, [
+    currentUserId,
+    authLoading,
+    fetchConnections,
+    clearConversation,
+  ]);
 
-  // Fetch conversation history.
+  /* FETCH MESSAGE HISTORY */
 
   useEffect(() => {
-    if (!selectedUserId || !currentUserId) return;
+    if (!selectedUserId || !currentUserId) {
+      return;
+    }
 
     const controller = new AbortController();
 
@@ -258,22 +485,25 @@ function MessagesPage() {
 
     const fetchMessages = async () => {
       try {
-        const response = await fetch(
-          `${API_BASE_URL}/message/messages?userId=${encodeURIComponent(
-            currentUserId
-          )}&recipientId=${encodeURIComponent(selectedUserId)}`,
-          { signal: controller.signal }
+        const data = await apiRequest(
+          `/message/messages?recipientId=${encodeURIComponent(
+            selectedUserId
+          )}`,
+          {
+            signal: controller.signal,
+          }
         );
 
-        if (!response.ok) {
-          throw new Error("Unable to load messages.");
+        if (
+          controller.signal.aborted ||
+          getId(selectedUserRef.current) !== selectedUserId
+        ) {
+          return;
         }
 
-        const data = await response.json();
-
-        if (controller.signal.aborted) return;
-
-        const history = Array.isArray(data) ? data : [];
+        const history = Array.isArray(data)
+          ? data
+          : [];
 
         setMessages((previous) =>
           mergeMessages(history, previous)
@@ -284,7 +514,7 @@ function MessagesPage() {
           [selectedUserId]: 0,
         }));
       } catch (error) {
-        if (error.name !== "AbortError") {
+        if (!controller.signal.aborted) {
           setMessageError(error.message);
         }
       } finally {
@@ -297,61 +527,103 @@ function MessagesPage() {
     fetchMessages();
 
     return () => controller.abort();
-  }, [selectedUserId, currentUserId]);
+  }, [
+    selectedUserId,
+    currentUserId,
+    isConnected,
+  ]);
 
-  // Scroll to the latest message.
+  /* SCROLL TO LATEST MESSAGE */
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({
-      behavior: "instant",
+      behavior: "auto",
       block: "end",
     });
-  }, [messages, loadingMessages, mobileChatOpen]);
+  }, [
+    messages,
+    loadingMessages,
+    mobileChatOpen,
+  ]);
 
-  const handleSelectUser = (connection) => {
-    if (getId(connection) !== selectedUserId) {
-      setMessages([]);
-      setNewMessage("");
-      setMessageError("");
-    }
+  /* SEND MESSAGE WITH ACKNOWLEDGEMENT */
 
-    selectedUserRef.current = connection;
-    setSelectedUser(connection);
-    setMobileChatOpen(true);
-    setMenuOpen(false);
-
-    setUnreadMessages((previous) => ({
-      ...previous,
-      [getId(connection)]: 0,
-    }));
-  };
-
-  const handleSendMessage = (e) => {
-    e.preventDefault();
+  const handleSendMessage = (event) => {
+    event.preventDefault();
 
     const text = newMessage.trim();
+    const recipientId = selectedUserId;
 
     if (
       !text ||
-      !selectedUserId ||
-      !currentUserId ||
-      !socket?.connected
+      !recipientId ||
+      !socket?.connected ||
+      sendingRef.current
     ) {
       return;
     }
 
-    socket.emit("sendMessage", {
-      senderId: currentUserId,
-      recipientId: selectedUserId,
-      message: text,
-    });
+    sendingRef.current = true;
 
-    setNewMessage("");
-    inputRef.current?.focus();
+    setSending(true);
+    setSendError("");
+
+    socket.timeout(10000).emit(
+      "sendMessage",
+      {
+        recipientId,
+        message: text,
+      },
+      (error, response) => {
+        sendingRef.current = false;
+        setSending(false);
+
+        if (
+          getId(selectedUserRef.current) !== recipientId
+        ) {
+          return;
+        }
+
+        if (error) {
+          setSendError(
+            "Delivery could not be confirmed. Check your conversation before retrying."
+          );
+          return;
+        }
+
+        if (!response?.success) {
+          setSendError(
+            response?.message ||
+            "Unable to send message."
+          );
+          return;
+        }
+
+        if (response.message?._id) {
+          setMessages((previous) =>
+            mergeMessages(previous, [
+              response.message,
+            ])
+          );
+        }
+
+        setNewMessage((previous) =>
+          previous.trim() === text
+            ? ""
+            : previous
+        );
+
+        inputRef.current?.focus();
+      }
+    );
   };
 
-  const handleDisconnectUser = () => {
-    if (!selectedUser) return;
+  /* PERSISTENT DISCONNECTION */
+
+  const handleDisconnectUser = async () => {
+    if (!selectedUser || disconnecting) return;
+
+    const recipientId = selectedUserId;
 
     const confirmed = window.confirm(
       `Disconnect from ${getName(selectedUser)}?`
@@ -359,26 +631,48 @@ function MessagesPage() {
 
     if (!confirmed) return;
 
-    setConnectedUsers((previous) =>
-      previous.filter(
-        (connection) => getId(connection) !== selectedUserId
-      )
+    setDisconnecting(true);
+    setSendError("");
+
+    try {
+      await apiRequest(
+        `/message/connections/${recipientId}`,
+        {
+          method: "DELETE",
+        }
+      );
+
+      setConnectedUsers((previous) =>
+        previous.filter(
+          (connection) =>
+            getId(connection) !== recipientId
+        )
+      );
+
+      if (
+        getId(selectedUserRef.current) === recipientId
+      ) {
+        clearConversation();
+      }
+
+      await fetchConnections();
+    } catch (error) {
+      setSendError(error.message);
+    } finally {
+      setDisconnecting(false);
+    }
+  };
+
+  /* DATE FORMATTING */
+
+  const formatTime = (timestamp) =>
+    new Date(timestamp).toLocaleTimeString(
+      "en-US",
+      {
+        hour: "numeric",
+        minute: "2-digit",
+      }
     );
-
-    selectedUserRef.current = null;
-    setSelectedUser(null);
-    setMessages([]);
-    setNewMessage("");
-    setMenuOpen(false);
-    setMobileChatOpen(false);
-  };
-
-  const formatTime = (timestamp) => {
-    return new Date(timestamp).toLocaleTimeString("en-US", {
-      hour: "numeric",
-      minute: "2-digit",
-    });
-  };
 
   const formatDate = (timestamp) => {
     const date = new Date(timestamp);
@@ -387,11 +681,15 @@ function MessagesPage() {
 
     yesterday.setDate(today.getDate() - 1);
 
-    if (date.toDateString() === today.toDateString()) {
+    if (
+      date.toDateString() === today.toDateString()
+    ) {
       return "Today";
     }
 
-    if (date.toDateString() === yesterday.toDateString()) {
+    if (
+      date.toDateString() === yesterday.toDateString()
+    ) {
       return "Yesterday";
     }
 
@@ -405,11 +703,11 @@ function MessagesPage() {
     });
   };
 
+  /* PAGE UI */
+
   return (
     <AppShell className="messages-shell">
       <div className="mp-page">
-
-        {/* PAGE HEADER */}
 
         <header className="mp-page-heading">
           <span className="mp-eyebrow">
@@ -449,17 +747,35 @@ function MessagesPage() {
                 placeholder="Search people..."
                 aria-label="Search conversations"
                 value={searchQuery}
-                onChange={(e) =>
-                  setSearchQuery(e.target.value)
+                onChange={(event) =>
+                  setSearchQuery(event.target.value)
                 }
               />
             </div>
 
             <div className="mp-conversation-list">
 
-              {filteredUsers.length > 0 ? (
+              {connectionError && (
+                <div className="mp-chat-status">
+                  <p>{connectionError}</p>
+
+                  <button
+                    type="button"
+                    onClick={fetchConnections}
+                  >
+                    Retry
+                  </button>
+                </div>
+              )}
+
+              {loadingConnections ? (
+                <div className="mp-chat-status">
+                  Loading connections...
+                </div>
+              ) : filteredUsers.length > 0 ? (
                 filteredUsers.map((connection) => {
-                  const connectionId = getId(connection);
+                  const connectionId =
+                    getId(connection);
 
                   const unread =
                     unreadMessages[connectionId] || 0;
@@ -480,7 +796,9 @@ function MessagesPage() {
                       <UserAvatar user={connection} />
 
                       <div className="mp-conversation-info">
-                        <strong>{getName(connection)}</strong>
+                        <strong>
+                          {getName(connection)}
+                        </strong>
 
                         <span>
                           {unread > 0
@@ -508,7 +826,7 @@ function MessagesPage() {
                   </p>
 
                   {!searchQuery && (
-                    <Link to="/">
+                    <Link to="/matching">
                       Find travel companions
                     </Link>
                   )}
@@ -530,14 +848,12 @@ function MessagesPage() {
 
           </aside>
 
-          {/* CONVERSATION AREA */}
+          {/* CHAT AREA */}
 
           <section className="mp-chat">
 
             {selectedUser ? (
               <>
-
-                {/* CHAT HEADER */}
 
                 <header className="mp-chat-header">
 
@@ -568,7 +884,9 @@ function MessagesPage() {
                       aria-label="Conversation options"
                       aria-expanded={menuOpen}
                       onClick={() =>
-                        setMenuOpen((previous) => !previous)
+                        setMenuOpen(
+                          (previous) => !previous
+                        )
                       }
                     >
                       <FaEllipsisH />
@@ -576,13 +894,19 @@ function MessagesPage() {
 
                     {menuOpen && (
                       <div className="mp-dropdown">
+
                         <button
                           type="button"
+                          disabled={disconnecting}
                           onClick={handleDisconnectUser}
                         >
                           <FaUserMinus />
-                          Disconnect
+
+                          {disconnecting
+                            ? "Disconnecting..."
+                            : "Disconnect"}
                         </button>
+
                       </div>
                     )}
 
@@ -616,15 +940,16 @@ function MessagesPage() {
                       </h3>
 
                       <p>
-                        Every great adventure starts with a
-                        conversation.
+                        Every great adventure starts
+                        with a conversation.
                       </p>
 
                     </div>
                   ) : (
                     messages.map((msg, index) => {
                       const sent =
-                        String(msg.senderId) === currentUserId;
+                        String(msg.senderId) ===
+                        currentUserId;
 
                       const previousMessage =
                         messages[index - 1];
@@ -634,13 +959,16 @@ function MessagesPage() {
                         new Date(
                           previousMessage.timestamp
                         ).toDateString() !==
-                          new Date(
-                            msg.timestamp
-                          ).toDateString();
+                        new Date(
+                          msg.timestamp
+                        ).toDateString();
 
                       return (
                         <React.Fragment
-                          key={`${msg.senderId}-${msg.timestamp}-${index}`}
+                          key={
+                            msg._id ||
+                            `${msg.senderId}-${msg.timestamp}-${index}`
+                          }
                         >
 
                           {showDate && (
@@ -676,13 +1004,24 @@ function MessagesPage() {
 
                 </div>
 
-                {/* MESSAGE COMPOSER */}
+                {/* CONNECTION STATUS */}
 
                 {!isConnected && (
                   <div className="mp-connection-status">
                     Connecting to messaging server...
                   </div>
                 )}
+
+                {sendError && (
+                  <div
+                    className="mp-connection-status"
+                    role="alert"
+                  >
+                    {sendError}
+                  </div>
+                )}
+
+                {/* MESSAGE COMPOSER */}
 
                 <form
                   className="mp-composer"
@@ -693,10 +1032,11 @@ function MessagesPage() {
                     ref={inputRef}
                     type="text"
                     value={newMessage}
+                    maxLength={4000}
                     aria-label="Message"
                     placeholder="Type a message..."
-                    onChange={(e) =>
-                      setNewMessage(e.target.value)
+                    onChange={(event) =>
+                      setNewMessage(event.target.value)
                     }
                   />
 
@@ -705,7 +1045,10 @@ function MessagesPage() {
                     className="mp-send-button"
                     aria-label="Send message"
                     disabled={
-                      !newMessage.trim() || !isConnected
+                      !newMessage.trim() ||
+                      !isConnected ||
+                      sending ||
+                      disconnecting
                     }
                   >
                     <FaPaperPlane />
@@ -716,26 +1059,30 @@ function MessagesPage() {
               </>
             ) : (
 
-              /* NO CONVERSATION SELECTED */
-
               <div className="mp-no-conversation">
 
                 <div className="mp-empty-icon">
                   <FaRegCommentDots />
                 </div>
 
-                <h2>Your next adventure starts here.</h2>
+                <h2>
+                  Your next adventure starts here.
+                </h2>
 
                 <p>
                   Select a conversation to start chatting
                   with your travel companions.
                 </p>
 
-                {connections.length === 0 && (
-                  <Link to="/" className="mp-discover-link">
-                    Discover travelers
-                  </Link>
-                )}
+                {!loadingConnections &&
+                  connections.length === 0 && (
+                    <Link
+                      to="/matching"
+                      className="mp-discover-link"
+                    >
+                      Discover travelers
+                    </Link>
+                  )}
 
               </div>
 

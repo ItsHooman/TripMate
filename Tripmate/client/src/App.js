@@ -19,12 +19,14 @@ import EventManagement from './pages/ManageEvents';
 import ProtectedRoute from './components/ProtectedRoute';
 import "./styles/global.css";
 import WelcomeGuidePage from './pages/WelcomeGuidePage';
+import { SocketProvider } from './context/SocketContext';
 
 function App() {
   return (
     <AuthProvider>
-      <Router>
-        <Routes>
+  <Router>
+    <SocketProvider>
+      <Routes>
           {/* Public routes */}
           <Route path="/" element={<AuthLandingPage />} />
           <Route path="/register" element={<Navigate to="/" replace />} />
@@ -156,9 +158,10 @@ function App() {
               </ProtectedRoute>
             }
           />
-        </Routes>
-      </Router>
-    </AuthProvider>
+              </Routes>
+    </SocketProvider>
+  </Router>
+</AuthProvider>
   );
 }
 

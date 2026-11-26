@@ -210,8 +210,11 @@ function MatchingPage() {
     if (!currentUserId) return;
 
     const newSocket = io(SOCKET_SERVER_URL, {
-      transports: ["websocket"],
-    });
+  transports: ["websocket"],
+  auth: {
+    token: localStorage.getItem("token"),
+  },
+});
 
     setSocket(newSocket);
 
@@ -472,29 +475,47 @@ function MatchingPage() {
 
   /* EXISTING CONNECTION FLOW */
 
-  const handleConnect = (match) => {
-    if (swipeLock.current) return;
+  
+const handleConnect = (match) => {
+  if (swipeLock.current) return;
 
-    if (!socket || !socketConnected || !currentUserId) {
-      setActionMessage(
-        "Connection unavailable. Please try again."
-      );
-      return;
-    }
-
-    socket.emit("connectionRequest", {
-      senderId: currentUserId,
-      receiverId: match._id,
-      user: {
-        _id: currentUserId,
-        name: user?.name || "Traveler",
-      },
-    });
-
+  if (!socket?.connected || !currentUserId) {
     setActionMessage(
-      "Connection requested. You can keep discovering travelers."
+      "Connection unavailable. Please try again."
     );
-  };
+    return;
+  }
+
+  setActionMessage("Sending connection request...");
+
+  socket.timeout(10000).emit(
+    "connectionRequest",
+    {
+      receiverId: match._id,
+    },
+    (error, response) => {
+      if (error) {
+        setActionMessage(
+          "Unable to confirm request. Please try again."
+        );
+        return;
+      }
+
+      if (!response?.success) {
+        setActionMessage(
+          response?.message ||
+          "Unable to request connection."
+        );
+        return;
+      }
+
+      setActionMessage(
+        "Connection requested. You can keep discovering travelers."
+      );
+    }
+  );
+};
+
 
   const handleMatchMessage = (traveler) => {
     if (!traveler?._id) return;

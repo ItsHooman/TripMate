@@ -1,5 +1,7 @@
+
 import React from "react";
 import { NavLink } from "react-router-dom";
+
 import {
   FiHome,
   FiGlobe,
@@ -7,9 +9,13 @@ import {
   FiUser,
 } from "react-icons/fi";
 
+import { useSocket } from "../context/SocketContext";
+
 import "../styles/global.css";
 
 function BottomNav() {
+  const { unreadCount } = useSocket();
+
   const navigation = [
     {
       path: "/matching",
@@ -25,6 +31,7 @@ function BottomNav() {
       path: "/messages",
       label: "Messages",
       icon: FiMessageCircle,
+      count: unreadCount,
     },
     {
       path: "/profile",
@@ -39,20 +46,35 @@ function BottomNav() {
       aria-label="Main navigation"
     >
       {navigation.map(
-        ({ path, label, icon: Icon }) => (
+        ({ path, label, icon: Icon, count }) => (
           <NavLink
             key={path}
             to={path}
+            aria-label={
+              count > 0
+                ? `${label}, ${count} unread`
+                : label
+            }
             className={({ isActive }) =>
               isActive
                 ? "bottom-nav-link active"
                 : "bottom-nav-link"
             }
           >
-            <Icon
-              className="bottom-nav-icon"
-              aria-hidden="true"
-            />
+            <div className="bottom-nav-icon-wrapper">
+
+              <Icon
+                className="bottom-nav-icon"
+                aria-hidden="true"
+              />
+
+              {count > 0 && (
+                <span className="tripmate-unread-badge">
+                  {count > 99 ? "99+" : count}
+                </span>
+              )}
+
+            </div>
 
             <span>{label}</span>
           </NavLink>
