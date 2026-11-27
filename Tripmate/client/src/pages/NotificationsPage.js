@@ -7,19 +7,17 @@ import React, {
 } from "react";
 
 import { useNavigate } from "react-router-dom";
-import { io } from "socket.io-client";
-
+import { useSocket } from "../context/SocketContext";
 import { AuthContext } from "../context/AuthContext";
 import "../styles/NotificationPage.css";
 import AppShell from "../components/AppShell";
 import API_BASE_URL from "../config/api";
 
-const SOCKET_SERVER_URL =
-  process.env.REACT_APP_SOCKET_URL ||
-  "http://localhost:5002";
 
 function NotificationPage() {
   const { user, authLoading } = useContext(AuthContext);
+
+  const { socket, refreshCounts } = useSocket();
 
   const userId = user?.id || user?._id;
 
@@ -85,59 +83,59 @@ function NotificationPage() {
 
   /* REAL-TIME NOTIFICATIONS */
 
-  useEffect(() => {
-    if (!userId || authLoading) return;
+  
+/* GLOBAL NOTIFICATION EVENTS */
 
-    const token = localStorage.getItem("token");
+useEffect(() => {
+  if (!socket || !userId) return;
 
-    const socket = io(SOCKET_SERVER_URL, {
-      transports: ["websocket"],
-      auth: { token },
-    });
+  socket.on("connect", fetchNotifications);
 
-    const handleConnect = () => {
-      socket.emit("joinRoom", userId);
-      fetchNotifications();
-    };
+  socket.on(
+    "connectionRequest",
+    fetchNotifications
+  );
 
-    socket.on("connect", handleConnect);
+  socket.on(
+    "connectionAccepted",
+    fetchNotifications
+  );
 
-    socket.on(
+  socket.on(
+    "newMatch",
+    fetchNotifications
+  );
+
+  socket.on(
+    "notificationsUpdated",
+    fetchNotifications
+  );
+
+  return () => {
+    socket.off("connect", fetchNotifications);
+
+    socket.off(
       "connectionRequest",
       fetchNotifications
     );
 
-    socket.on(
+    socket.off(
       "connectionAccepted",
       fetchNotifications
     );
 
-    socket.on(
+    socket.off(
       "newMatch",
       fetchNotifications
     );
 
-    return () => {
-      socket.off("connect", handleConnect);
+    socket.off(
+      "notificationsUpdated",
+      fetchNotifications
+    );
+  };
+}, [socket, userId, fetchNotifications]);
 
-      socket.off(
-        "connectionRequest",
-        fetchNotifications
-      );
-
-      socket.off(
-        "connectionAccepted",
-        fetchNotifications
-      );
-
-      socket.off(
-        "newMatch",
-        fetchNotifications
-      );
-
-      socket.disconnect();
-    };
-  }, [userId, authLoading, fetchNotifications]);
 
   /* ACCEPT OR IGNORE A REQUEST */
 
@@ -172,6 +170,7 @@ function NotificationPage() {
           data.message || "Unable to process request."
         );
       }
+      await refreshCounts();
 
       setNotifications((previous) =>
         previous.filter(
@@ -219,6 +218,7 @@ function NotificationPage() {
           "Unable to update notification."
         );
       }
+      await refreshCounts();
 
       setNotifications((previous) =>
         previous.map((item) =>

@@ -15,7 +15,11 @@ const router = express.Router();
 
 const PUBLIC_PROFILE_FIELDS =
     'name bio interests preferredDestinations ' +
-    'location travelStyle profilePicture';
+    'location travelStyle profilePicture profilePictures';
+
+const MATCHING_PROFILE_FIELDS =
+    PUBLIC_PROFILE_FIELDS +
+    ' locationDetails destinationDetails';
 
 // Build ranked recommendations
 async function getRecommendations(userId) {
@@ -74,28 +78,31 @@ const excludedUserIds = previousSwipes.map((swipe) =>
     }
 
     const excludedIds = [
-        userId,
-        ...(currentUser.contacts || []),
-    ];
+    userId,
+    ...(currentUser.contacts || []),
+    ...excludedUserIds,
+];
 
     const users = await User.find({
-            _id: {
-                $nin: [userId, ...excludedUserIds]
-            },
-            role: { $ne: "admin" },
-            isBanned: { $ne: true },
-            isActive: { $ne: false }
-        })
-        .select("-password -email")
-        .populate({
-            path: "profile",
-            select: "-email"
-        });
+    _id: {
+        $nin: excludedIds
+    },
+
+    role: { $ne: 'admin' },
+
+    status: { $ne: 'banned' },
+
+    isBanned: { $ne: true },
+
+    isActive: { $ne: false }
+})
+    .select('_id name role')
+    .lean();
 
     const profiles = await Profile.find({
         user: { $in: users.map(user => user._id) },
     })
-        .select(`user ${PUBLIC_PROFILE_FIELDS}`)
+        .select(`user ${MATCHING_PROFILE_FIELDS}`)
         .lean();
 
     const profileMap = new Map(
@@ -106,37 +113,45 @@ const excludedUserIds = previousSwipes.map((swipe) =>
     );
 
     const recommendations = users
-        .map(user => {
-            const profile = profileMap.get(String(user._id));
+    .map(user => {
+        const profile = profileMap.get(String(user._id));
 
-            if (!isProfileComplete(profile)) {
-                return null;
-            }
+        if (!isProfileComplete(profile)) {
+            return null;
+        }
 
-            const compatibility = calculateCompatibility(
-                currentProfile,
-                profile
-            );
+        // Calculate compatibility
+        const compatibility = calculateCompatibility(
+            currentProfile,
+            profile
+        );
 
-            return {
-                _id: user._id,
-                name: profile.name || user.name,
-                role: user.role,
-                profile,
-                ...compatibility,
-            };
-        })
-        .filter(Boolean)
-        .sort((a, b) => {
-            return (
-                b.similarityScore - a.similarityScore ||
-                b.sharedDestinations.length -
-                    a.sharedDestinations.length ||
-                b.sharedInterests.length -
-                    a.sharedInterests.length ||
-                String(a._id).localeCompare(String(b._id))
-            );
-        });
+        // Exclude geographical details from public response
+        const {
+            locationDetails,
+            destinationDetails,
+            ...publicProfile
+        } = profile;
+
+        return {
+            _id: user._id,
+            name: profile.name || user.name,
+            role: user.role,
+            profile: publicProfile,
+            ...compatibility,
+        };
+    })
+    .filter(Boolean)
+    .sort((a, b) => {
+        return (
+            b.similarityScore - a.similarityScore ||
+            b.sharedDestinations.length -
+                a.sharedDestinations.length ||
+            b.sharedInterests.length -
+                a.sharedInterests.length ||
+            String(a._id).localeCompare(String(b._id))
+        );
+    });
 
     return {
         status: 200,

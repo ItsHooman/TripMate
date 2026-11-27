@@ -1,7 +1,15 @@
-import React, { useState, useEffect } from "react";
+import React, {
+  useState,
+  useEffect,
+  useContext,
+} from "react";
+
 import { Link, useNavigate } from "react-router-dom";
 import TripMateLogo from "../components/TripMateLogo";
 import "../styles/ProfileSetup.css";
+import { AuthContext } from "../context/AuthContext";
+import ProfilePhotoGallery from "../components/ProfilePhotoGallery";
+import LocationAutocomplete from "../components/LocationAutocomplete";
 
 const INTEREST_OPTIONS = [
   "Adventure",
@@ -58,97 +66,114 @@ const toArray = (value) => {
 
 function ProfileSetup() {
   const navigate = useNavigate();
+  const { user, authLoading } = useContext(AuthContext);
 
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
+  const [name, setName] = useState(user?.name || "");
+  const [email, setEmail] = useState(user?.email || "");
   const [interests, setInterests] = useState([]);
   const [preferredDestinations, setPreferredDestinations] =
     useState([]);
   const [destinationInput, setDestinationInput] = useState("");
+  const [destinationType, setDestinationType] = useState("city");
   const [customInterest, setCustomInterest] = useState("");
   const [travelStyle, setTravelStyle] = useState("");
   const [bio, setBio] = useState("");
   const [location, setLocation] = useState("");
+  const [selectedLocation, setSelectedLocation] = useState(null);
+  const [destinationDetails, setDestinationDetails] = useState([]);
 
-  const [profilePicture, setProfilePicture] = useState("");
-  const [profileFile, setProfileFile] = useState(null);
-  const [preview, setPreview] = useState("");
+  const [photos, setPhotos] = useState([]);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
-  // Load existing profile
-  useEffect(() => {
-    const token = localStorage.getItem("token");
+  
+  // Load existing profile and account information
+useEffect(() => {
+  if (authLoading) return;
 
-    fetch("/api/profile", {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
+  const token = localStorage.getItem("token");
+  const controller = new AbortController();
+
+  setName(user?.name || "");
+  setEmail(user?.email || "");
+
+  fetch("/api/profile", {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    signal: controller.signal,
+  })
+    .then((res) => {
+      if (res.status === 404) return null;
+
+      if (!res.ok) {
+        throw new Error(
+          `Profile request failed (${res.status})`
+        );
+      }
+
+      return res.json();
     })
-      .then((res) => {
-        if (!res.ok) {
-          throw new Error(`Profile request failed (${res.status})`);
-        }
+    .then((data) => {
+      if (!data) return;
 
-        return res.json();
-      })
-      .then((data) => {
-        if (!data) return;
+      setName(data.name || user?.name || "");
+      setEmail(user?.email || data.email || "");
 
-        setName(data.name ?? "");
-        setEmail(data.email ?? "");
-        setInterests(toArray(data.interests));
-        setPreferredDestinations(
-          toArray(data.preferredDestinations)
-        );
-        setTravelStyle(data.travelStyle ?? "");
-        setBio(data.bio ?? "");
-        setLocation(data.location ?? "");
-        setProfilePicture(data.profilePicture ?? "");
-      })
-      .catch((err) => {
-        console.error("Could not load profile:", err);
-        setError(
-          "We couldn't load your existing profile. Please check your details."
-        );
-      })
-      .finally(() => setLoading(false));
-  }, []);
+      setInterests(toArray(data.interests));
 
-  // Generate and clean up image preview
-  useEffect(() => {
-    if (!profileFile) {
-      setPreview("");
-      return;
-    }
+      setPreferredDestinations(
+        toArray(data.preferredDestinations)
+      );
 
-    const imageUrl = URL.createObjectURL(profileFile);
+      setTravelStyle(data.travelStyle || "");
+      setBio(data.bio || "");
+      setLocation(data.location || "");
+      setSelectedLocation(
+  data.locationDetails || null
+);
 
-    setPreview(imageUrl);
+setDestinationDetails(
+  Array.isArray(data.destinationDetails)
+    ? data.destinationDetails
+    : []
+);
+      const existingPhotos =
+  Array.isArray(data.profilePictures) &&
+  data.profilePictures.length > 0
+    ? data.profilePictures
+    : data.profilePicture
+      ? [data.profilePicture]
+      : [];
 
-    return () => URL.revokeObjectURL(imageUrl);
-  }, [profileFile]);
+setPhotos(
+  existingPhotos.map(url => ({
+    id: url,
+    url,
+  }))
+);
+    })
+    .catch((err) => {
+      if (err.name === "AbortError") return;
 
-  const handleFileChange = (e) => {
-    const file = e.target.files?.[0];
+      console.error("Could not load profile:", err);
 
-    if (!file) return;
+      setError(
+        "We couldn't load your existing profile."
+      );
+    })
+    .finally(() => {
+      if (!controller.signal.aborted) {
+        setLoading(false);
+      }
+    });
 
-    if (!file.type.startsWith("image/")) {
-      setError("Please select a valid image file.");
-      return;
-    }
+  return () => controller.abort();
+}, [user, authLoading]);
 
-    if (file.size > 5 * 1024 * 1024) {
-      setError("Please select an image smaller than 5 MB.");
-      return;
-    }
-
-    setError("");
-    setProfileFile(file);
-  };
+  
 
   const toggleInterest = (interest) => {
     setInterests((previous) =>
@@ -174,27 +199,62 @@ function ProfileSetup() {
     setCustomInterest("");
   };
 
-  const addDestination = () => {
-    const value = destinationInput.trim();
+  const addDestination = (place) => {
+  if (!place?.placeId || !place?.label) return;
 
-    if (!value) return;
+  const label = place.label.trim();
 
-    setPreferredDestinations((previous) =>
-      previous.some(
-        (item) => item.toLowerCase() === value.toLowerCase()
-      )
-        ? previous
-        : [...previous, value]
+  const alreadySelected = preferredDestinations.some(
+    item => item.toLowerCase() === label.toLowerCase()
+  );
+
+  if (
+    !alreadySelected &&
+    preferredDestinations.length >= 10
+  ) {
+    setError("You can add up to 10 destinations.");
+    return;
+  }
+
+  setPreferredDestinations(previous => {
+    const exists = previous.some(
+      item => item.toLowerCase() === label.toLowerCase()
     );
 
-    setDestinationInput("");
-  };
+    return exists ? previous : [...previous, label];
+  });
+
+  setDestinationDetails(previous => [
+    ...previous.filter(
+      item =>
+        item.placeId !== place.placeId &&
+        item.label.toLowerCase() !== label.toLowerCase()
+    ),
+    { ...place, label }
+  ]);
+
+  setDestinationInput("");
+  setError("");
+};
 
   const removeDestination = (destination) => {
-    setPreferredDestinations((previous) =>
-      previous.filter((item) => item !== destination)
-    );
-  };
+  const label = destination.trim().toLowerCase();
+
+  setPreferredDestinations(previous =>
+    previous.filter(
+      item => item.trim().toLowerCase() !== label
+    )
+  );
+
+  setDestinationDetails(previous =>
+    previous.filter(
+      item => item.label.trim().toLowerCase() !== label
+    )
+  );
+
+  setError("");
+};
+
 
   const handleEnter = (e, callback) => {
     if (e.key === "Enter") {
@@ -212,12 +272,15 @@ function ProfileSetup() {
       ...(customInterest.trim() ? [customInterest.trim()] : []),
     ];
 
-    const finalDestinations = [
-      ...preferredDestinations,
-      ...(destinationInput.trim()
-        ? [destinationInput.trim()]
-        : []),
-    ];
+    const finalDestinations = [...preferredDestinations];
+
+    if (
+        !selectedLocation ||
+        selectedLocation.label !== location
+      ) {
+        setError("Please select your city from the location search results.");
+        return;
+      }
 
     if (!name.trim() || !email.trim() || !location.trim()) {
       setError("Please complete your personal information.");
@@ -231,6 +294,11 @@ function ProfileSetup() {
 
     if (finalDestinations.length === 0) {
       setError("Please add at least one destination.");
+      return;
+    }
+
+    if (!bio.trim()) {
+      setError("Please write a short introduction about yourself.");
       return;
     }
 
@@ -249,18 +317,63 @@ function ProfileSetup() {
       formData.append("email", email.trim());
       formData.append("interests", finalInterests.join(", "));
       formData.append(
-        "preferredDestinations",
-        finalDestinations.join(", ")
-      );
+      "preferredDestinations",
+      JSON.stringify(finalDestinations)
+    );
       formData.append("travelStyle", travelStyle);
       formData.append("bio", bio.trim());
       formData.append("location", location.trim());
+      formData.append(
+  "locationDetails",
+  JSON.stringify(selectedLocation)
+);
 
-      if (profileFile) {
-        formData.append("profilePicture", profileFile);
-      } else if (profilePicture) {
-        formData.append("profilePicture", profilePicture);
-      }
+const validDestinationDetails = destinationDetails.filter(
+  place => finalDestinations.includes(place.label)
+);
+
+formData.append(
+  "destinationDetails",
+  JSON.stringify(validDestinationDetails)
+);
+
+     const retainedPhotos = photos.filter(
+  photo => !photo.file
+);
+
+const newPhotos = photos.filter(
+  photo => photo.file
+);
+
+formData.append(
+  "retainedPhotos",
+  JSON.stringify(
+    retainedPhotos.map(photo => photo.url)
+  )
+);
+
+newPhotos.forEach(photo => {
+  formData.append(
+    "profilePictures",
+    photo.file
+  );
+});
+
+const uploadOrder = [
+  ...retainedPhotos,
+  ...newPhotos,
+];
+
+const photoOrder = photos.map(photo =>
+  uploadOrder.findIndex(
+    item => item.id === photo.id
+  )
+);
+
+formData.append(
+  "photoOrder",
+  JSON.stringify(photoOrder)
+);
 
       const response = await fetch("/api/profile", {
         method: "POST",
@@ -271,17 +384,24 @@ function ProfileSetup() {
       });
 
       if (!response.ok) {
-        throw new Error("Could not save profile.");
-      }
+  const errorData = await response.json().catch(() => ({}));
+
+  console.error("Backend validation error:", errorData);
+
+  throw new Error(
+    errorData.message || "Could not save profile."
+  );
+}
 
       navigate("/welcome");
     } catch (err) {
-      console.error("Profile update failed:", err);
+  console.error("Profile update failed:", err);
 
-      setError(
-        "Something went wrong while saving your profile. Please try again."
-      );
-    } finally {
+  setError(
+    err.message ||
+    "Something went wrong while saving your profile."
+  );
+} finally {
       setSaving(false);
     }
   };
@@ -341,55 +461,14 @@ function ProfileSetup() {
         ) : (
           <form className="ps-form" onSubmit={handleSubmit}>
 
-            {/* Profile photo */}
-            <div className="ps-photo-section">
+            {/* Profile photo gallery */}
 
-              <div className="ps-avatar-wrapper">
-                <img
-                  className="ps-avatar"
-                  src={
-                    preview ||
-                    profilePicture ||
-                    DEFAULT_PROFILE_PICTURE
-                  }
-                  alt="Your profile"
-                  onError={(e) => {
-                    e.currentTarget.onerror = null;
-                    e.currentTarget.src =
-                      DEFAULT_PROFILE_PICTURE;
-                  }}
-                />
-
-                <label
-                  htmlFor="ps-photo-upload"
-                  className="ps-camera-button"
-                  aria-label="Change profile photo"
-                >
-                  <i className="fas fa-camera" />
-                </label>
-              </div>
-
-              <input
-                id="ps-photo-upload"
-                className="ps-file-input"
-                type="file"
-                accept="image/*"
-                onChange={handleFileChange}
+              <ProfilePhotoGallery
+                photos={photos}
+                onChange={setPhotos}
+                disabled={saving}
               />
-
-              <label
-                htmlFor="ps-photo-upload"
-                className="ps-upload-label"
-              >
-                {profilePicture || profileFile
-                  ? "Change profile photo"
-                  : "Upload profile photo"}
-              </label>
-
-              <span className="ps-hint">
-                JPG, PNG or other images · Max 5 MB
-              </span>
-            </div>
+            
 
             {/* Personal information */}
             <section className="ps-section">
@@ -426,11 +505,14 @@ function ProfileSetup() {
                   <input
                     id="ps-email"
                     type="email"
-                    placeholder="you@example.com"
                     value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    readOnly
                     required
                   />
+
+                    <span className="ps-hint">
+                      Email linked to your TripMate account.
+                    </span>
                 </div>
 
                 <div className="ps-field ps-full-width">
@@ -438,20 +520,25 @@ function ProfileSetup() {
                     Where are you based?
                   </label>
 
-                  <div className="ps-input-icon">
-                    <i className="fas fa-map-marker-alt" />
-
-                    <input
+                  <LocationAutocomplete
                       id="ps-location"
-                      type="text"
-                      placeholder="e.g. Toronto, Canada"
                       value={location}
-                      onChange={(e) =>
-                        setLocation(e.target.value)
-                      }
-                      required
+                      placeholder="Search for your city..."
+                      type="city"
+                      disabled={saving}
+                      onChange={(value) => {
+                        setLocation(value);
+                        setSelectedLocation(null);
+                      }}
+                      onSelect={(place) => {
+                        setLocation(place.label);
+                        setSelectedLocation(place);
+                      }}
                     />
-                  </div>
+
+                    <span className="ps-hint">
+                      Select your city from the search results.
+                    </span>
                 </div>
 
                 <div className="ps-field ps-full-width">
@@ -556,30 +643,56 @@ function ProfileSetup() {
                 </div>
               </div>
 
-              <div className="ps-add-row">
-                <input
-                  aria-label="Dream destination"
-                  type="text"
-                  placeholder="e.g. Amsterdam, Tokyo, Spain"
-                  value={destinationInput}
-                  onChange={(e) =>
-                    setDestinationInput(e.target.value)
-                  }
-                  onKeyDown={(e) =>
-                    handleEnter(e, addDestination)
-                  }
-                />
+              <div className="ps-location-type">
+                    <button
+                      type="button"
+                      className={
+                        destinationType === "city"
+                          ? "ps-location-option active"
+                          : "ps-location-option"
+                      }
+                      onClick={() => {
+                        setDestinationType("city");
+                        setDestinationInput("");
+                      }}
+                    >
+                      Cities
+                    </button>
 
-                <button
-                  type="button"
-                  className="ps-add-button"
-                  onClick={addDestination}
-                  disabled={!destinationInput.trim()}
-                >
-                  <i className="fas fa-plus" />
-                  Add
-                </button>
-              </div>
+                    <button
+                      type="button"
+                      className={
+                        destinationType === "country"
+                          ? "ps-location-option active"
+                          : "ps-location-option"
+                      }
+                      onClick={() => {
+                        setDestinationType("country");
+                        setDestinationInput("");
+                      }}
+                    >
+                      Countries
+                    </button>
+                  </div>
+
+<LocationAutocomplete
+  value={destinationInput}
+  type={destinationType}
+  placeholder={
+    destinationType === "city"
+      ? "Search for a city..."
+      : "Search for a country..."
+  }
+  disabled={
+    saving || preferredDestinations.length >= 10
+  }
+  onChange={setDestinationInput}
+  onSelect={addDestination}
+/>
+
+<span className="ps-hint">
+  {preferredDestinations.length} of 10 destinations selected
+</span>
 
               {preferredDestinations.length > 0 && (
                 <div className="ps-destinations">

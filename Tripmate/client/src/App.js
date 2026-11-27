@@ -20,12 +20,15 @@ import ProtectedRoute from './components/ProtectedRoute';
 import "./styles/global.css";
 import WelcomeGuidePage from './pages/WelcomeGuidePage';
 import { SocketProvider } from './context/SocketContext';
+import GlobalNotifications from './components/GlobalNotifications';
 
 function App() {
   return (
     <AuthProvider>
   <Router>
     <SocketProvider>
+      <GlobalNotifications />
+      
       <Routes>
           {/* Public routes */}
           <Route path="/" element={<AuthLandingPage />} />

@@ -7,7 +7,7 @@ import React, {
 
 import TinderCard from "react-tinder-card";
 import { Link, useNavigate } from "react-router-dom";
-import { io } from "socket.io-client";
+import { useSocket } from "../context/SocketContext";
 
 import {
   FaUserAlt,
@@ -15,12 +15,13 @@ import {
   FaGlobeAmericas,
   FaHeart,
   FaTimes,
-  FaUserPlus,
   FaCompass,
   FaRedo,
   FaCheckCircle,
   FaStar,
   FaArrowRight,
+  FaChevronLeft,
+  FaChevronRight,
 } from "react-icons/fa";
 
 import AppShell from "../components/AppShell";
@@ -29,8 +30,7 @@ import { AuthContext } from "../context/AuthContext";
 import API_BASE_URL from "../config/api";
 import "../styles/MatchingPage.css";
 
-const SOCKET_SERVER_URL =
-  process.env.REACT_APP_SOCKET_URL || "http://localhost:5002";
+
 
 const normalizeList = (value) => {
   if (Array.isArray(value)) return value.filter(Boolean);
@@ -51,14 +51,6 @@ const normalizeText = (value) =>
     .toLowerCase()
     .replace(/\s+/g, " ");
 
-const readStorage = (key) => {
-  try {
-    const value = JSON.parse(localStorage.getItem(key));
-    return Array.isArray(value) ? value : [];
-  } catch {
-    return [];
-  }
-};
 
 const getImageUrl = (value) => {
   if (!value) return "";
@@ -156,15 +148,17 @@ function MatchingPage() {
   const [profileIncomplete, setProfileIncomplete] =
     useState(false);
 
-  const [socket, setSocket] = useState(null);
-  const [socketConnected, setSocketConnected] =
-    useState(false);
+    const {
+      socket,
+      refreshCounts,
+    } = useSocket();
 
   const [swipeDirection, setSwipeDirection] =
     useState("");
 
   const [isSwiping, setIsSwiping] = useState(false);
   const [imageFailed, setImageFailed] = useState(false);
+  const [photoIndex, setPhotoIndex] = useState(0);
   const [showBreakdown, setShowBreakdown] = useState(false);
   const [actionMessage, setActionMessage] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
@@ -174,6 +168,44 @@ function MatchingPage() {
 
   const currentMatch = matches[currentIndex];
   const profile = currentMatch?.profile || {};
+  const photos = [...new Set([
+  profile.profilePicture,
+  ...normalizeList(profile.profilePictures),
+].filter(photo =>
+  typeof photo === "string" && photo.trim()
+))].slice(0, 6);
+
+const activePhotoIndex = Math.min(
+  photoIndex,
+  Math.max(0, photos.length - 1)
+);
+
+const activePhoto = photos[activePhotoIndex];
+
+const relatedDestinations = Array.isArray(
+  currentMatch?.relatedDestinations
+)
+  ? currentMatch.relatedDestinations
+  : [];
+
+const partialDestinationMatches =
+  relatedDestinations.filter(
+    item => item.compatibility > 0 &&
+            item.compatibility < 100
+  );
+
+const distanceKm = currentMatch?.distanceKm;
+
+const hasDistance =
+  typeof distanceKm === "number" &&
+  Number.isFinite(distanceKm) &&
+  distanceKm >= 0;
+
+const relatedDestinationSet = new Set(
+  partialDestinationMatches.map(
+    item => normalizeText(item.theirDestination)
+  )
+);
 
   const interests = normalizeList(profile.interests);
 
@@ -206,102 +238,51 @@ function MatchingPage() {
 
   /* SOCKET CONNECTION */
 
-  useEffect(() => {
-    if (!currentUserId) return;
+  
+/* SHARED SOCKET EVENTS */
 
-    const newSocket = io(SOCKET_SERVER_URL, {
-  transports: ["websocket"],
-  auth: {
-    token: localStorage.getItem("token"),
-  },
-});
+useEffect(() => {
+  if (!socket || !currentUserId) return;
 
-    setSocket(newSocket);
+  const handleNewMatch = (data) => {
+    if (data?.user) {
+      setMatchedUser(data.user);
+    }
 
-    const handleConnect = () => {
-      setSocketConnected(true);
-      newSocket.emit("joinRoom", currentUserId);
-    };
+    refreshCounts();
+  };
 
-    const handleDisconnect = () => {
-      setSocketConnected(false);
-    };
+  const handleConnectionAccepted = (data) => {
+    refreshCounts();
 
-    const openConnection = (id, name) => {
-      if (!id || String(id) === String(currentUserId)) {
-        return;
-      }
+    setActionMessage(
+      `You are now connected with ${
+        data?.senderName || "a traveler"
+      }.`
+    );
+  };
 
-      const connectedUsers = readStorage("connectedUsers");
+  socket.on("newMatch", handleNewMatch);
 
-      if (
-        !connectedUsers.some(
-          (item) => String(item._id) === String(id)
-        )
-      ) {
-        connectedUsers.push({
-          _id: id,
-          name: name || "Traveler",
-          profile: {
-            name: name || "Traveler",
-          },
-        });
-      }
+  socket.on(
+    "connectionAccepted",
+    handleConnectionAccepted
+  );
 
-      localStorage.setItem(
-        "connectedUsers",
-        JSON.stringify(connectedUsers)
-      );
+  return () => {
+    socket.off("newMatch", handleNewMatch);
 
-      navigate("/messages", {
-        state: {
-          connectedUsers,
-          currentUserId,
-          selectedUser: connectedUsers.find(
-            (item) => String(item._id) === String(id)
-          ),
-        },
-      });
-    };
+    socket.off(
+      "connectionAccepted",
+      handleConnectionAccepted
+    );
+  };
+}, [
+  socket,
+  currentUserId,
+  refreshCounts,
+]);
 
-    const handleAccepted = ({ senderId, senderName }) => {
-      openConnection(senderId, senderName);
-    };
-
-    const handleConfirmed = (data) => {
-      const id =
-        data.receiverId &&
-        String(data.receiverId) !== String(currentUserId)
-          ? data.receiverId
-          : data.senderId;
-
-      const name =
-        id === data.receiverId
-          ? data.receiverName
-          : data.senderName;
-
-      openConnection(id, name);
-    };
-
-    const handleNewMatch = (data) => {
-      if (data?.user) setMatchedUser(data.user);
-    };
-
-    newSocket.on("newMatch", handleNewMatch);
-    newSocket.on("connect", handleConnect);
-    newSocket.on("disconnect", handleDisconnect);
-    newSocket.on("connectionAccepted", handleAccepted);
-    newSocket.on("connectionConfirmed", handleConfirmed);
-
-    return () => {
-      newSocket.off("newMatch", handleNewMatch);
-      newSocket.off("connect", handleConnect);
-      newSocket.off("disconnect", handleDisconnect);
-      newSocket.off("connectionAccepted", handleAccepted);
-      newSocket.off("connectionConfirmed", handleConfirmed);
-      newSocket.disconnect();
-    };
-  }, [currentUserId, navigate]);
 
   /* FETCH RANKED RECOMMENDATIONS */
 
@@ -389,14 +370,33 @@ function MatchingPage() {
   /* RESET CARD STATE */
 
   useEffect(() => {
-    setSwipeDirection("");
-    setIsSwiping(false);
-    setImageFailed(false);
-    setShowBreakdown(false);
-    setActionMessage("");
-    swipeLock.current = false;
-  }, [currentIndex, currentMatch?._id, refreshKey]);
+  setSwipeDirection("");
+  setIsSwiping(false);
+  setImageFailed(false);
+  setPhotoIndex(0);
+  setShowBreakdown(false);
+  setActionMessage("");
+  swipeLock.current = false;
+}, [currentIndex, currentMatch?._id, refreshKey]);
 
+  const changePhoto = (event, direction) => {
+  event.stopPropagation();
+
+  if (
+    swipeLock.current ||
+    isSwiping ||
+    photos.length <= 1
+  ) {
+    return;
+  }
+
+  setImageFailed(false);
+
+  setPhotoIndex(previous =>
+    (previous + direction + photos.length) %
+    photos.length
+  );
+};
   /* SWIPE ACTIONS */
 
   
@@ -476,69 +476,20 @@ function MatchingPage() {
   /* EXISTING CONNECTION FLOW */
 
   
-const handleConnect = (match) => {
-  if (swipeLock.current) return;
-
-  if (!socket?.connected || !currentUserId) {
-    setActionMessage(
-      "Connection unavailable. Please try again."
-    );
-    return;
-  }
-
-  setActionMessage("Sending connection request...");
-
-  socket.timeout(10000).emit(
-    "connectionRequest",
-    {
-      receiverId: match._id,
-    },
-    (error, response) => {
-      if (error) {
-        setActionMessage(
-          "Unable to confirm request. Please try again."
-        );
-        return;
-      }
-
-      if (!response?.success) {
-        setActionMessage(
-          response?.message ||
-          "Unable to request connection."
-        );
-        return;
-      }
-
-      setActionMessage(
-        "Connection requested. You can keep discovering travelers."
-      );
-    }
-  );
-};
 
 
   const handleMatchMessage = (traveler) => {
-    if (!traveler?._id) return;
+  if (!traveler?._id) return;
 
-    const connectedUsers = readStorage("connectedUsers");
-    const updatedUsers = [
-      ...connectedUsers.filter(
-        (item) => String(item._id) !== String(traveler._id)
-      ),
-      traveler,
-    ];
+  setMatchedUser(null);
+  refreshCounts();
 
-    localStorage.setItem("connectedUsers", JSON.stringify(updatedUsers));
-    setMatchedUser(null);
-
-    navigate("/messages", {
-      state: {
-        currentUserId,
-        connectedUsers: updatedUsers,
-        selectedUser: traveler,
-      },
-    });
-  };
+  navigate("/messages", {
+    state: {
+      selectedUser: traveler,
+    },
+  });
+};
 
   const restartDiscovery = () => {
     setRefreshKey((previous) => previous + 1);
@@ -685,19 +636,70 @@ const handleConnect = (match) => {
                   {/* PROFILE PHOTO */}
 
                   <div className="match-image-container">
-                    {profile.profilePicture && !imageFailed ? (
-                      <img
-                        src={getImageUrl(profile.profilePicture)}
-                        alt={profile.name || "Traveler"}
-                        className="match-profile-image"
-                        onError={() => setImageFailed(true)}
-                        draggable={false}
-                      />
-                    ) : (
-                      <div className="match-default-avatar">
-                        <FaUserAlt />
-                      </div>
-                    )}
+                    {activePhoto && !imageFailed ? (
+  <img
+    key={activePhoto}
+    src={getImageUrl(activePhoto)}
+    alt={`${profile.name || "Traveler"} — photo ${
+      activePhotoIndex + 1
+    }`}
+    className="match-profile-image"
+    onError={() => setImageFailed(true)}
+    draggable={false}
+  />
+) : (
+  <div className="match-default-avatar">
+    <FaUserAlt />
+  </div>
+)}
+
+{photos.length > 1 && (
+  <>
+    <div className="match-photo-progress">
+      {photos.map((photo, index) => (
+        <span
+          key={photo}
+          className={
+            index === activePhotoIndex
+              ? "active"
+              : ""
+          }
+        />
+      ))}
+    </div>
+
+    <button
+      type="button"
+      className="match-photo-arrow match-photo-prev pressable"
+      aria-label="Previous profile photo"
+      disabled={isSwiping}
+      onMouseDown={event => event.stopPropagation()}
+      onTouchStart={event => event.stopPropagation()}
+      onClick={event => changePhoto(event, -1)}
+    >
+      <FaChevronLeft className="pressable" />
+    </button>
+
+    <button
+      type="button"
+      className="match-photo-arrow match-photo-next pressable"
+      aria-label="Next profile photo"
+      disabled={isSwiping}
+      onMouseDown={event => event.stopPropagation()}
+      onTouchStart={event => event.stopPropagation()}
+      onClick={event => changePhoto(event, 1)}
+    >
+      <FaChevronRight className="pressable" />
+    </button>
+
+    <div
+      className="match-photo-counter"
+      aria-live="polite"
+    >
+      {activePhotoIndex + 1} / {photos.length}
+    </div>
+  </>
+)}
 
                     {currentIndex === 0 && score >= 75 && (
                       <div className="match-top-label">
@@ -745,6 +747,18 @@ const handleConnect = (match) => {
                               "Location not specified"}
                           </span>
                         </div>
+
+                        {hasDistance && (
+                            <div className="match-distance">
+                              {currentMatch.sameLocation
+                                ? "Same home city"
+                                : distanceKm < 1
+                                ? "Home cities less than 1 km apart"
+                                : `Home cities approximately ${
+                                    distanceKm.toLocaleString()
+                                  } km apart`}
+                            </div>
+                          )}
 
                         <span className="match-compatibility-label">
                           {currentMatch.matchLabel ||
@@ -796,6 +810,40 @@ const handleConnect = (match) => {
                         </div>
                       )}
 
+                      {partialDestinationMatches.length > 0 && (
+  <div className="match-related-destinations">
+    {partialDestinationMatches.map((item, index) => (
+      <div
+        className="match-related-destination"
+        key={`${item.yourDestination}-${item.theirDestination}-${index}`}
+      >
+        <FaGlobeAmericas />
+
+        <div>
+          <strong>
+            {item.compatibility === 75
+              ? "Compatible travel destinations"
+              : "Interested in the same country"}
+          </strong>
+
+          <span>
+            You: {item.yourDestination}
+          </span>
+
+          <span>
+            Them: {item.theirDestination}
+          </span>
+        </div>
+
+        <span className="match-related-score">
+          {item.compatibility}%
+        </span>
+      </div>
+    ))}
+  </div>
+)}
+
+
                       {currentMatch.sameTravelStyle && (
                         <div className="match-reason">
                           <FaCheckCircle />
@@ -811,17 +859,29 @@ const handleConnect = (match) => {
                           </div>
                         )}
 
-                      {currentMatch.sameLocation && (
-                        <div className="match-reason">
-                          <FaCheckCircle />
-                          <span>Same location</span>
-                        </div>
-                      )}
+                      {currentMatch.sameLocation ? (
+                            <div className="match-reason">
+                              <FaCheckCircle />
+                              <span>Same home city</span>
+                            </div>
+                          ) : hasDistance && distanceKm <= 250 &&
+                              currentMatch.breakdown?.location > 0 ? (
+                            <div className="match-reason">
+                              <FaCheckCircle />
+                              <span>
+                                {distanceKm <= 50
+                                  ? "You live in nearby cities"
+                                  : "You live in the same region"}
+                              </span>
+                            </div>
+                          ) : null}
 
                       {!sharedInterests.length &&
-                        !sharedDestinations.length &&
-                        !breakdown?.travelStyle &&
-                        !currentMatch.sameLocation && (
+                          !sharedDestinations.length &&
+                          !relatedDestinations.length &&
+                          !breakdown?.travelStyle &&
+                          !breakdown?.location &&
+                          !currentMatch.sameLocation && (
                           <p className="match-empty-text">
                             Different preferences can still
                             lead to new adventures.
@@ -920,23 +980,43 @@ const handleConnect = (match) => {
 
                       <div className="match-interest-tags">
                         {destinations.map((destination, index) => {
-                          const isShared =
-                            sharedDestinationSet.has(
-                              normalizeText(destination)
-                            );
+  const normalized = normalizeText(destination);
 
-                          return (
-                            <span
-                              key={`${destination}-${index}`}
-                              className={`match-interest-tag ${
-                                isShared ? "match-tag-shared" : ""
-                              }`}
-                            >
-                              {isShared && <FaCheckCircle />}
-                              {destination}
-                            </span>
-                          );
-                        })}
+  const isShared =
+    sharedDestinationSet.has(normalized) ||
+    relatedDestinations.some(item =>
+      item.compatibility === 100 &&
+      normalizeText(item.theirDestination) === normalized
+    );
+
+  const isRelated =
+    !isShared &&
+    relatedDestinationSet.has(normalized);
+
+  return (
+    <span
+      key={`${destination}-${index}`}
+      className={`match-interest-tag ${
+        isShared
+          ? "match-tag-shared"
+          : isRelated
+          ? "match-tag-related"
+          : ""
+      }`}
+      title={
+        isShared
+          ? "Shared destination"
+          : isRelated
+          ? "Related travel destination"
+          : undefined
+      }
+    >
+      {isShared && <FaCheckCircle />}
+      {isRelated && <FaGlobeAmericas />}
+      {destination}
+    </span>
+  );
+})}
                       </div>
                     </section>
 
@@ -966,36 +1046,6 @@ const handleConnect = (match) => {
                     {/* PROFILE ACTIONS */}
 
                     <div className="match-card-actions">
-                      <button
-                        type="button"
-                        className="match-connect-button pressable"
-                        disabled={
-                          isSwiping ||
-                          !socketConnected ||
-                          actionMessage.startsWith(
-                            "Connection requested"
-                          )
-                        }
-                        onClick={() => handleConnect(currentMatch)}
-                      >
-                        <FaUserPlus />
-
-                        {actionMessage.startsWith(
-                          "Connection requested"
-                        )
-                          ? "Request sent"
-                          : "Connect"}
-                      </button>
-
-                      {actionMessage && (
-                        <p
-                          className="match-action-message"
-                          role="status"
-                        >
-                          {actionMessage}
-                        </p>
-                      )}
-
                       <Link
                         to={`/user-profile/${currentMatch._id}`}
                         className="profile-link-simple pressable"
@@ -1097,7 +1147,7 @@ const handleConnect = (match) => {
         currentUser={user}
         matchedUser={matchedUser}
         onClose={() => setMatchedUser(null)}
-        onMessage={handleMatchMessage}
+        onMessage={() => handleMatchMessage(matchedUser)}
       />
     </AppShell>
   );

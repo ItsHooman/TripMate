@@ -1,5 +1,9 @@
 
-import React, { useEffect, useState } from "react";
+import React, {
+  useEffect,
+  useState,
+  useContext,
+} from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import {
   FaArrowLeft,
@@ -8,7 +12,11 @@ import {
   FaCalendarAlt,
   FaHeart,
   FaGlobeAmericas,
-  FaUserPlus,
+  FaChevronLeft,
+FaChevronRight,
+FaComment,
+FaCheckCircle,
+FaExpand,
   FaFlag,
   FaTimes,
   FaSuitcase,
@@ -17,6 +25,9 @@ import {
 import "../styles/UserProfile.css";
 import AppShell from "../components/AppShell";
 import API_BASE_URL from "../config/api";
+import { AuthContext } from "../context/AuthContext";
+import { useSocket } from "../context/SocketContext";
+import TripMatchModal from "../components/TripMatchModal";
 
 const defaultProfilePicture =
   "https://i.postimg.cc/rwk4Qqd6/avatar-account-flat-isolated-on-transparent-background-for-graphic-and-web-design-default-social-med.jpg";
@@ -45,6 +56,30 @@ const normalizeList = (value) => {
 function UserProfile() {
   const { userId } = useParams();
   const navigate = useNavigate();
+  const { user } = useContext(AuthContext);
+const { refreshCounts } = useSocket();
+
+const currentUserId = user?.id || user?._id;
+
+const isOwnProfile =
+  String(currentUserId) === String(userId);
+
+const [relationship, setRelationship] =
+  useState("loading");
+
+const [swipeSubmitting, setSwipeSubmitting] =
+  useState(false);
+
+const [relationshipError, setRelationshipError] =
+  useState("");
+
+const [matchedUser, setMatchedUser] =
+  useState(null);
+
+const [photoIndex, setPhotoIndex] = useState(0);
+
+const [galleryOpen, setGalleryOpen] =
+  useState(false);
 
   const [userDetails, setUserDetails] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -177,36 +212,209 @@ function UserProfile() {
       setReportSubmitting(false);
     }
   };
+useEffect(() => {
+  if (!currentUserId || !userId) return;
 
-  const handleConnect = () => {
-    if (!userDetails) return;
+  const controller = new AbortController();
 
-    const connectedUsers =
-      JSON.parse(localStorage.getItem("connectedUsers")) || [];
+  setRelationship("loading");
+  setRelationshipError("");
+  setPhotoIndex(0);
+  setGalleryOpen(false);
 
-    const isAlreadyConnected = connectedUsers.some(
-      (user) => user._id === userDetails._id
+  const checkRelationship = async () => {
+    if (isOwnProfile) {
+      setRelationship("own");
+      return;
+    }
+
+    try {
+      const headers = {
+        Authorization:
+          `Bearer ${localStorage.getItem("token")}`,
+      };
+
+      const [connectionsResponse, historyResponse] =
+        await Promise.all([
+          fetch(`${API_BASE_URL}/message/connections`, {
+            headers,
+            signal: controller.signal,
+          }),
+
+          fetch(`${API_BASE_URL}/swipes/history`, {
+            headers,
+            signal: controller.signal,
+          }),
+        ]);
+
+      if (
+        !connectionsResponse.ok ||
+        !historyResponse.ok
+      ) {
+        throw new Error(
+          "Unable to check connection status."
+        );
+      }
+
+      const connections =
+        await connectionsResponse.json();
+
+      const history =
+        await historyResponse.json();
+
+      if (controller.signal.aborted) return;
+
+      const connected = connections.some(
+        item => String(item._id) === String(userId)
+      );
+
+      if (connected) {
+        setRelationship("connected");
+        return;
+      }
+
+      const previousSwipe = history.swipes?.find(
+        item =>
+          String(item.targetUserId) === String(userId)
+      );
+
+      if (previousSwipe?.action === "like") {
+        setRelationship("liked");
+      } else if (previousSwipe?.action === "pass") {
+        setRelationship("passed");
+      } else {
+        setRelationship("none");
+      }
+
+    } catch (error) {
+      if (error.name === "AbortError") return;
+
+      setRelationship("error");
+      setRelationshipError(error.message);
+    }
+  };
+
+  checkRelationship();
+
+  return () => controller.abort();
+
+}, [userId, currentUserId, isOwnProfile]);
+
+const handleProfileSwipe = async (action) => {
+  if (
+    swipeSubmitting ||
+    relationship !== "none" ||
+    !userDetails ||
+    isOwnProfile
+  ) {
+    return;
+  }
+
+  setSwipeSubmitting(true);
+  setRelationshipError("");
+
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}/swipes`,
+      {
+        method: "POST",
+
+        headers: {
+          "Content-Type": "application/json",
+          Authorization:
+            `Bearer ${localStorage.getItem("token")}`,
+        },
+
+        body: JSON.stringify({
+          targetUserId: userId,
+          action,
+        }),
+      }
     );
 
-    if (!isAlreadyConnected) {
-      connectedUsers.push(userDetails);
+    const data = await response.json();
 
-      localStorage.setItem(
-        "connectedUsers",
-        JSON.stringify(connectedUsers)
+    if (!response.ok) {
+      throw new Error(
+        data.message || "Unable to save your decision."
       );
     }
 
-    navigate("/messages", {
-      state: {
-        selectedUser: userDetails,
-        connectedUsers,
-      },
-    });
-  };
+    if (data.isMatched) {
+      setRelationship("connected");
+      setMatchedUser(data.user || userDetails);
+      refreshCounts();
+    } else {
+      setRelationship(
+        action === "like" ? "liked" : "passed"
+      );
+
+      navigate("/matching");
+    }
+
+  } catch (error) {
+    setRelationshipError(error.message);
+  } finally {
+    setSwipeSubmitting(false);
+  }
+};
+
+const handleMessage = () => {
+  if (
+    relationship !== "connected" ||
+    !userDetails
+  ) {
+    return;
+  }
+
+  setMatchedUser(null);
+
+  navigate("/messages", {
+    state: {
+      selectedUser: userDetails,
+    },
+  });
+};
 
   const profile = userDetails?.profile || {};
+const getImageUrl = (value) => {
+  if (!value) return defaultProfilePicture;
 
+  if (value.startsWith("/uploads/")) {
+    return `${
+      API_BASE_URL.replace(/\/api\/?$/, "")
+    }${value}`;
+  }
+
+  return value;
+};
+
+const photos = [...new Set([
+  profile.profilePicture,
+
+  ...(Array.isArray(profile.profilePictures)
+    ? profile.profilePictures
+    : []),
+
+].filter(photo =>
+  typeof photo === "string" && photo.trim()
+))].slice(0, 6);
+
+const activePhotoIndex = Math.min(
+  photoIndex,
+  Math.max(0, photos.length - 1)
+);
+
+const activePhoto = photos[activePhotoIndex];
+
+const changePhoto = (direction) => {
+  if (photos.length <= 1) return;
+
+  setPhotoIndex(previous =>
+    (previous + direction + photos.length) %
+    photos.length
+  );
+};
   const interests = normalizeList(profile.interests);
 
   const destinations = normalizeList(
@@ -221,6 +429,53 @@ function UserProfile() {
           profile.travelDates.end
         ).toLocaleDateString()}`
       : "No upcoming travel dates added yet.";
+
+
+        useEffect(() => {
+  if (!galleryOpen) return;
+
+  const previousOverflow =
+    document.body.style.overflow;
+
+  document.body.style.overflow = "hidden";
+
+  const handleKeyDown = (event) => {
+    if (event.key === "Escape") {
+      setGalleryOpen(false);
+    }
+
+    if (
+      event.key === "ArrowRight" &&
+      photos.length > 1
+    ) {
+      setPhotoIndex(previous =>
+        (previous + 1) % photos.length
+      );
+    }
+
+    if (
+      event.key === "ArrowLeft" &&
+      photos.length > 1
+    ) {
+      setPhotoIndex(previous =>
+        (previous - 1 + photos.length) %
+        photos.length
+      );
+    }
+  };
+
+  window.addEventListener("keydown", handleKeyDown);
+
+  return () => {
+    document.body.style.overflow =
+      previousOverflow;
+
+    window.removeEventListener(
+      "keydown",
+      handleKeyDown
+    );
+  };
+}, [galleryOpen, photos.length]);
 
   return (
     <AppShell className="public-profile-page">
@@ -250,27 +505,87 @@ function UserProfile() {
 
               {/* COVER */}
 
-              <div className="public-profile-cover">
-                <FaGlobeAmericas className="public-cover-globe" />
-              </div>
+              <div className="public-photo-gallery">
+
+  <button
+    type="button"
+    className="public-main-photo"
+    onClick={() => setGalleryOpen(true)}
+    disabled={!photos.length}
+    aria-label="Open full-screen photo gallery"
+  >
+    <img
+      src={getImageUrl(activePhoto)}
+      alt={`${profile.name || "Traveler"} — photo ${
+        activePhotoIndex + 1
+      }`}
+      onError={event => {
+        event.currentTarget.onerror = null;
+        event.currentTarget.src = defaultProfilePicture;
+      }}
+    />
+
+    {photos.length > 0 && (
+      <span className="public-expand-photo">
+        <FaExpand />
+      </span>
+    )}
+  </button>
+
+  {photos.length > 1 && (
+    <>
+      <button
+        type="button"
+        className="public-gallery-arrow previous"
+        onClick={() => changePhoto(-1)}
+        aria-label="Previous photo"
+      >
+        <FaChevronLeft />
+      </button>
+
+      <button
+        type="button"
+        className="public-gallery-arrow next"
+        onClick={() => changePhoto(1)}
+        aria-label="Next photo"
+      >
+        <FaChevronRight />
+      </button>
+
+      <span className="public-gallery-counter">
+        {activePhotoIndex + 1} / {photos.length}
+      </span>
+    </>
+  )}
+
+</div>
+
+{photos.length > 1 && (
+  <div className="public-photo-thumbnails">
+    {photos.map((photo, index) => (
+      <button
+        type="button"
+        key={photo}
+        className={`public-photo-thumbnail ${
+          index === activePhotoIndex ? "active" : ""
+        }`}
+        onClick={() => setPhotoIndex(index)}
+        aria-label={`View photo ${index + 1}`}
+        aria-pressed={index === activePhotoIndex}
+      >
+        <img
+          src={getImageUrl(photo)}
+          alt={`Profile photo ${index + 1}`}
+        />
+      </button>
+    ))}
+  </div>
+)}
 
               {/* PROFILE HEADER */}
 
               <div className="public-profile-header">
-                <div className="public-avatar-wrapper">
-                  <img
-                    src={
-                      profile.profilePicture ||
-                      defaultProfilePicture
-                    }
-                    alt={profile.name || "Traveler"}
-                    className="public-profile-avatar"
-                    onError={(e) => {
-                      e.target.onerror = null;
-                      e.target.src = defaultProfilePicture;
-                    }}
-                  />
-                </div>
+                
 
                 <h1 className="public-profile-name">
                   {profile.name || "Anonymous Traveler"}
@@ -290,14 +605,76 @@ function UserProfile() {
                   </div>
                 )}
 
-                <button
-                  type="button"
-                  className="public-connect-button"
-                  onClick={handleConnect}
-                >
-                  <FaUserPlus />
-                  Connect
-                </button>
+                <div className="public-relationship-actions">
+
+  {relationship === "loading" && (
+    <p>Checking connection status...</p>
+  )}
+
+  {relationship === "none" && (
+    <div className="public-swipe-actions">
+      <button
+        type="button"
+        className="public-pass-button"
+        disabled={swipeSubmitting}
+        onClick={() => handleProfileSwipe("pass")}
+      >
+        <FaTimes />
+        Pass
+      </button>
+
+      <button
+        type="button"
+        className="public-like-button"
+        disabled={swipeSubmitting}
+        onClick={() => handleProfileSwipe("like")}
+      >
+        <FaHeart />
+        Like
+      </button>
+    </div>
+  )}
+
+  {relationship === "liked" && (
+    <div className="public-relationship-status">
+      <FaHeart />
+      Liked — waiting for a mutual match
+    </div>
+  )}
+
+  {relationship === "passed" && (
+    <div className="public-relationship-status">
+      You passed on this traveler
+    </div>
+  )}
+
+  {relationship === "connected" && (
+    <button
+      type="button"
+      className="public-connect-button"
+      onClick={handleMessage}
+    >
+      <FaComment />
+      Send message
+    </button>
+  )}
+
+  {relationship === "own" && (
+    <Link
+      to="/profile-setup"
+      className="public-connect-button"
+    >
+      Edit profile
+    </Link>
+  )}
+
+  {relationshipError && (
+    <p className="public-profile-error">
+      {relationshipError}
+    </p>
+  )}
+
+</div>
               </div>
 
               {/* PROFILE INFORMATION */}
@@ -489,6 +866,70 @@ function UserProfile() {
           </>
         )}
       </div>
+      {galleryOpen && photos.length > 0 && (
+  <div
+    className="public-lightbox"
+    role="dialog"
+    aria-modal="true"
+    aria-label="Profile photo gallery"
+    onClick={() => setGalleryOpen(false)}
+  >
+    <button
+      type="button"
+      className="public-lightbox-close"
+      onClick={() => setGalleryOpen(false)}
+      aria-label="Close photo gallery"
+      autoFocus
+    >
+      <FaTimes />
+    </button>
+
+    <img
+      src={getImageUrl(activePhoto)}
+      alt={`Profile photo ${activePhotoIndex + 1}`}
+      onClick={event => event.stopPropagation()}
+    />
+
+    {photos.length > 1 && (
+      <>
+        <button
+          type="button"
+          className="public-lightbox-arrow previous"
+          onClick={event => {
+            event.stopPropagation();
+            changePhoto(-1);
+          }}
+          aria-label="Previous photo"
+        >
+          <FaChevronLeft />
+        </button>
+
+        <button
+          type="button"
+          className="public-lightbox-arrow next"
+          onClick={event => {
+            event.stopPropagation();
+            changePhoto(1);
+          }}
+          aria-label="Next photo"
+        >
+          <FaChevronRight />
+        </button>
+      </>
+    )}
+
+    <span className="public-lightbox-counter">
+      {activePhotoIndex + 1} / {photos.length}
+    </span>
+  </div>
+)}
+
+<TripMatchModal
+  currentUser={user}
+  matchedUser={matchedUser}
+  onClose={() => setMatchedUser(null)}
+  onMessage={handleMessage}
+/>
     </AppShell>
   );
 }

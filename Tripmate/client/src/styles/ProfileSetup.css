@@ -812,3 +812,52 @@
         animation-duration: 0.01ms !important;
     }
 }
+/* Read-only account information */
+
+.ps-form input[readonly] {
+    background: var(--ps-soft);
+    color: var(--ps-muted);
+    cursor: default;
+}
+
+.ps-form input[readonly]:focus {
+    border-color: var(--ps-border);
+    box-shadow: none;
+}
+
+/* Location search type selector */
+
+.ps-location-type {
+    display: inline-flex;
+    gap: 4px;
+    padding: 4px;
+    margin-bottom: 12px;
+    background: var(--ps-soft);
+    border-radius: 10px;
+}
+
+.ps-location-option {
+    padding: 9px 18px;
+    border: none;
+    border-radius: 7px;
+    background: transparent;
+    color: var(--ps-muted);
+    font-family: inherit;
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s;
+}
+
+.ps-location-option.active {
+    background: var(--ps-primary);
+    color: white;
+}
+
+.ps-location-option:hover:not(.active) {
+    color: var(--ps-primary);
+}
+
+.la-container + .ps-hint {
+    margin-top: 8px;
+}

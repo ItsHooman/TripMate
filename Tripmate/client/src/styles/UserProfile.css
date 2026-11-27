@@ -636,3 +636,276 @@
     transition: none !important;
   }
 }
+/* PROFILE PHOTO GALLERY */
+
+.public-photo-gallery {
+  position: relative;
+  width: 100%;
+  height: clamp(280px, 48dvh, 480px);
+  overflow: hidden;
+  background: var(--surface-soft);
+}
+
+.public-main-photo {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: zoom-in;
+}
+
+.public-main-photo img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 35%;
+}
+
+.public-gallery-arrow,
+.public-expand-photo {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.45);
+  color: white;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+}
+
+.public-gallery-arrow {
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.public-gallery-arrow.previous {
+  left: 14px;
+}
+
+.public-gallery-arrow.next {
+  right: 14px;
+}
+
+.public-expand-photo {
+  top: 15px;
+  right: 15px;
+}
+
+.public-gallery-counter {
+  position: absolute;
+  bottom: 14px;
+  right: 14px;
+  padding: 7px 12px;
+  background: rgba(0, 0, 0, 0.55);
+  color: white;
+  border-radius: 999px;
+  font-size: 0.75rem;
+}
+
+.public-photo-thumbnails {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 8px;
+  padding: 14px;
+  background: var(--surface);
+}
+
+.public-photo-thumbnail {
+  min-width: 0;
+  aspect-ratio: 1;
+  padding: 3px;
+  border: 2px solid transparent;
+  border-radius: 12px;
+  background: transparent;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.public-photo-thumbnail.active {
+  border-color: var(--primary);
+}
+
+.public-photo-thumbnail img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 7px;
+  object-fit: cover;
+}
+
+.public-profile-header {
+  margin-top: 0;
+  padding: 24px;
+}
+
+/* RELATIONSHIP ACTIONS */
+
+.public-relationship-actions {
+  width: 100%;
+  max-width: 360px;
+  margin: 20px auto 0;
+}
+
+.public-swipe-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.public-like-button,
+.public-pass-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  min-height: 48px;
+  padding: 12px;
+  border-radius: 12px;
+  font-family: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.public-pass-button {
+  background: var(--surface);
+  color: #bd5757;
+  border: 1px solid var(--border);
+}
+
+.public-like-button {
+  background: var(--primary);
+  color: white;
+  border: 1px solid var(--primary);
+}
+
+.public-like-button:hover {
+  background: var(--primary-dark);
+}
+
+.public-pass-button:hover {
+  background: #fff0f0;
+}
+
+.public-like-button:disabled,
+.public-pass-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.public-relationship-status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 13px;
+  border-radius: 12px;
+  background: var(--surface-soft);
+  color: var(--primary);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.public-relationship-actions .public-connect-button {
+  width: 100%;
+  margin: 0;
+  text-decoration: none;
+}
+
+/* FULL SCREEN PHOTO VIEWER */
+
+.public-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(12, 10, 9, 0.97);
+}
+
+.public-lightbox > img {
+  max-width: 90vw;
+  max-height: 85dvh;
+  object-fit: contain;
+  border-radius: 8px;
+}
+
+.public-lightbox-close,
+.public-lightbox-arrow {
+  position: absolute;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 46px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.15);
+  color: white;
+  font-size: 18px;
+  cursor: pointer;
+}
+
+.public-lightbox-close {
+  top: 20px;
+  right: 20px;
+}
+
+.public-lightbox-arrow {
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.public-lightbox-arrow.previous {
+  left: 20px;
+}
+
+.public-lightbox-arrow.next {
+  right: 20px;
+}
+
+.public-lightbox-counter {
+  position: absolute;
+  bottom: 25px;
+  color: white;
+  font-size: 0.85rem;
+}
+
+@media (max-width: 640px) {
+  .public-photo-gallery {
+    height: 340px;
+  }
+
+  .public-photo-thumbnails {
+    padding: 10px;
+    gap: 4px;
+  }
+
+  .public-photo-thumbnail {
+    border-radius: 8px;
+    padding: 2px;
+  }
+
+  .public-profile-header {
+    padding: 20px 16px;
+  }
+
+  .public-lightbox-arrow.previous {
+    left: 8px;
+  }
+
+  .public-lightbox-arrow.next {
+    right: 8px;
+  }
+}

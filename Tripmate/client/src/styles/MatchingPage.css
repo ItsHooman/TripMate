@@ -898,3 +898,239 @@
     animation-duration: 0.01ms !important;
   }
 }
+
+/* ========================================
+   PROFILE PHOTO CAROUSEL
+======================================== */
+
+.match-image-container {
+  height: clamp(250px, 36dvh, 360px);
+}
+
+.match-photo-progress {
+  position: absolute;
+  top: 10px;
+  left: 12px;
+  right: 12px;
+  z-index: 4;
+
+  display: flex;
+  gap: 5px;
+
+  pointer-events: none;
+}
+
+.match-photo-progress span {
+  flex: 1;
+  height: 4px;
+
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.45);
+
+  transition: background 0.2s ease;
+}
+
+.match-photo-progress span.active {
+  background: #ffffff;
+}
+
+.match-photo-arrow {
+  position: absolute;
+  top: 50%;
+  z-index: 6;
+
+  transform: translateY(-50%);
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  width: 40px;
+  height: 40px;
+  padding: 0;
+
+  background: rgba(25, 20, 16, 0.42);
+  color: #ffffff;
+
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 50%;
+
+  font-size: 15px;
+  cursor: pointer;
+  touch-action: manipulation;
+
+  backdrop-filter: blur(8px);
+  transition: background 0.2s ease;
+}
+
+.match-photo-arrow:hover:not(:disabled) {
+  background: rgba(25, 20, 16, 0.75);
+}
+
+.match-photo-arrow:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.match-photo-arrow:focus-visible {
+  outline: 2px solid white;
+  outline-offset: 3px;
+}
+
+.match-photo-arrow svg {
+  pointer-events: none;
+}
+
+.match-photo-prev {
+  left: 12px;
+}
+
+.match-photo-next {
+  right: 12px;
+}
+
+.match-photo-counter {
+  position: absolute;
+  bottom: 12px;
+  right: 12px;
+  z-index: 4;
+
+  padding: 6px 11px;
+
+  background: rgba(25, 20, 16, 0.55);
+  color: white;
+
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+
+  backdrop-filter: blur(8px);
+  pointer-events: none;
+}
+
+.match-top-label {
+  top: 25px;
+  pointer-events: none;
+}
+
+/* ========================================
+   GEOGRAPHICAL COMPATIBILITY
+======================================== */
+
+.match-distance {
+  margin: -2px 0 8px;
+
+  color: var(--primary);
+  font-size: 0.73rem;
+  font-weight: 500;
+  line-height: 1.5;
+}
+
+.match-related-destinations {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+
+  margin: 10px 0 12px;
+}
+
+.match-related-destination {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+
+  padding: 12px;
+
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.match-related-destination > svg {
+  flex-shrink: 0;
+  margin-top: 3px;
+
+  color: var(--primary);
+  font-size: 0.9rem;
+}
+
+.match-related-destination > div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+
+  flex: 1;
+  min-width: 0;
+}
+
+.match-related-destination strong {
+  color: var(--text);
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.match-related-destination > div > span {
+  color: var(--muted);
+  font-size: 0.72rem;
+  line-height: 1.5;
+
+  text-transform: capitalize;
+  overflow-wrap: anywhere;
+}
+
+.match-related-score {
+  flex-shrink: 0;
+
+  padding: 5px 8px;
+
+  background: #fff2da;
+  color: #946b25;
+
+  border-radius: 8px;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.match-interest-tag.match-tag-related {
+  background: #fff2da;
+  color: #946b25;
+}
+
+.match-tag-related svg {
+  font-size: 0.7rem;
+  flex-shrink: 0;
+}
+
+/* ========================================
+   MOBILE CAROUSEL
+======================================== */
+
+@media (max-width: 640px) {
+  .match-image-container {
+    height: clamp(230px, 34dvh, 310px);
+  }
+
+  .match-photo-arrow {
+    width: 44px;
+    height: 44px;
+    font-size: 13px;
+  }
+
+  .match-photo-prev {
+    left: 10px;
+  }
+
+  .match-photo-next {
+    right: 10px;
+  }
+
+  .match-related-destination {
+    padding: 10px;
+    gap: 8px;
+  }
+
+  .match-distance {
+    font-size: 0.7rem;
+  }
+}

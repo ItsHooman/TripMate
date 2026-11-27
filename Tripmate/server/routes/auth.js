@@ -25,9 +25,10 @@ router.post('/register', async (req, res) => {
         await newUser.save();
 
         // Create a profile with only the required fields
-        const newProfile = new Profile({
-            user: newUser._id,   // Reference to the user
-            name: newUser.name,   // Pass the name to the profile
+       const newProfile = new Profile({
+            user: newUser._id,
+            name: newUser.name,
+            email: newUser.email,
         });
 
         // Save the profile to the database

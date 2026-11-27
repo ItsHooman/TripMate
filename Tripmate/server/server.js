@@ -35,6 +35,7 @@ const notificationRoutes = require("./routes/notificationRoutes");
 const checkBan = require("./routes/checkban");
 const messageRoutes = require("./routes/messages");
 const swipeRoutes = require("./routes/swipes");
+const locationRoutes = require('./routes/locations');
 
 /* SERVER CONFIGURATION */
 
@@ -66,6 +67,7 @@ app.use("/api", checkBan);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/reports", reportRoutes);
 app.use("/api/swipes", swipeRoutes);
+app.use('/api/locations', locationRoutes);
 
 /* STATIC FILES */
 

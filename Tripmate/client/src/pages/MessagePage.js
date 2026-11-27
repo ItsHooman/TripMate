@@ -8,7 +8,7 @@ import React, {
 } from "react";
 
 import { useLocation, Link } from "react-router-dom";
-import { io } from "socket.io-client";
+import { useSocket } from "../context/SocketContext";
 
 import {
   FaSearch,
@@ -25,9 +25,7 @@ import { AuthContext } from "../context/AuthContext";
 import AppShell from "../components/AppShell";
 import API_BASE_URL from "../config/api";
 
-const SOCKET_SERVER_URL =
-  process.env.REACT_APP_SOCKET_URL ||
-  "http://localhost:5002";
+
 
 /* HELPERS */
 
@@ -159,11 +157,16 @@ function MessagesPage() {
   const [newMessage, setNewMessage] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
 
-  const [unreadMessages, setUnreadMessages] =
-    useState({});
+  const {
+  socket,
+  isConnected,
+  unreadBySender: unreadMessages,
+  markConversationAsRead,
+  refreshCounts,
+} = useSocket();
 
-  const [socket, setSocket] = useState(null);
-  const [isConnected, setIsConnected] = useState(false);
+  
+ 
 
   const [loadingConnections, setLoadingConnections] =
     useState(true);
@@ -243,10 +246,7 @@ function MessagesPage() {
     setMobileChatOpen(true);
     setMenuOpen(false);
 
-    setUnreadMessages((previous) => ({
-      ...previous,
-      [getId(connection)]: 0,
-    }));
+    
   }, []);
 
   /* FETCH PERSISTENT CONNECTIONS */
@@ -310,7 +310,6 @@ function MessagesPage() {
 
     clearConversation();
     setConnectedUsers([]);
-    setUnreadMessages({});
     setLoadingConnections(true);
 
     fetchConnections();
@@ -349,127 +348,96 @@ function MessagesPage() {
 
   /* AUTHENTICATED SOCKET */
 
-  useEffect(() => {
-    if (!currentUserId || authLoading) return;
+  
+/* SHARED SOCKET EVENTS */
 
-    const token = localStorage.getItem("token");
+useEffect(() => {
+  if (!socket || !currentUserId) return;
 
-    const newSocket = io(SOCKET_SERVER_URL, {
-      transports: ["websocket"],
-      auth: { token },
-    });
+  const handleMessage = (data) => {
+    if (!data?.message || !data?.timestamp) return;
 
-    const handleConnect = () => {
-      setIsConnected(true);
-      setConnectionError("");
-      fetchConnections();
-    };
+    const senderId = String(data.senderId);
+    const recipientId = String(data.recipientId);
 
-    const handleDisconnect = () => {
-      setIsConnected(false);
-    };
-
-    const handleConnectError = (error) => {
-      setIsConnected(false);
-      setConnectionError(error.message);
-    };
-
-    const handleMessage = (data) => {
-      if (!data?.message || !data?.timestamp) {
-        return;
-      }
-
-      const senderId = String(data.senderId);
-      const recipientId = String(data.recipientId);
-
-      const activeId = getId(
-        selectedUserRef.current
-      );
-
-      const isSentByMe =
-        senderId === currentUserId;
-
-      const isReceivedByMe =
-        recipientId === currentUserId;
-
-      if (!isSentByMe && !isReceivedByMe) {
-        return;
-      }
-
-      const belongsToConversation =
-        (isSentByMe && recipientId === activeId) ||
-        (isReceivedByMe && senderId === activeId);
-
-      if (belongsToConversation) {
-        setMessages((previous) =>
-          mergeMessages(previous, [data])
-        );
-      } else if (isReceivedByMe) {
-        setUnreadMessages((previous) => ({
-          ...previous,
-          [senderId]:
-            (previous[senderId] || 0) + 1,
-        }));
-      }
-    };
-
-    const handleConnectionRemoved = (data) => {
-      const removedId = String(
-        data?.userId || ""
-      );
-
-      setConnectedUsers((previous) =>
-        previous.filter(
-          (connection) =>
-            getId(connection) !== removedId
-        )
-      );
-
-      if (
-        getId(selectedUserRef.current) === removedId
-      ) {
-        clearConversation();
-      }
-
-      fetchConnections();
-    };
-
-    newSocket.on("connect", handleConnect);
-    newSocket.on("disconnect", handleDisconnect);
-    newSocket.on("connect_error", handleConnectError);
-
-    newSocket.on(
-      "receiveMessage",
-      handleMessage
+    const activeId = getId(
+      selectedUserRef.current
     );
 
-    newSocket.on(
-      "newMatch",
-      fetchConnections
+    const isSentByMe =
+      senderId === currentUserId;
+
+    const isReceivedByMe =
+      recipientId === currentUserId;
+
+    const belongsToConversation =
+      (isSentByMe && recipientId === activeId) ||
+      (isReceivedByMe && senderId === activeId);
+
+    if (belongsToConversation) {
+      setMessages((previous) =>
+        mergeMessages(previous, [data])
+      );
+    }
+  };
+
+  const handleConnectionRemoved = (data) => {
+    const removedId = String(
+      data?.userId || ""
     );
 
-    newSocket.on(
+    setConnectedUsers((previous) =>
+      previous.filter(
+        (connection) =>
+          getId(connection) !== removedId
+      )
+    );
+
+    if (
+      getId(selectedUserRef.current) === removedId
+    ) {
+      clearConversation();
+    }
+
+    fetchConnections();
+  };
+
+  socket.on("connect", fetchConnections);
+  socket.on("receiveMessage", handleMessage);
+  socket.on("newMatch", fetchConnections);
+  socket.on("connectionAccepted", fetchConnections);
+
+  socket.on(
+    "connectionRemoved",
+    handleConnectionRemoved
+  );
+
+  if (socket.connected) {
+    fetchConnections();
+  }
+
+  return () => {
+    socket.off("connect", fetchConnections);
+    socket.off("receiveMessage", handleMessage);
+    socket.off("newMatch", fetchConnections);
+
+    socket.off(
       "connectionAccepted",
       fetchConnections
     );
 
-    newSocket.on(
+    socket.off(
       "connectionRemoved",
       handleConnectionRemoved
     );
+  };
+}, [
+  socket,
+  currentUserId,
+  fetchConnections,
+  clearConversation,
+]);
 
-    setSocket(newSocket);
-
-    return () => {
-      newSocket.removeAllListeners();
-      newSocket.disconnect();
-    };
-  }, [
-    currentUserId,
-    authLoading,
-    fetchConnections,
-    clearConversation,
-  ]);
 
   /* FETCH MESSAGE HISTORY */
 
@@ -509,10 +477,7 @@ function MessagesPage() {
           mergeMessages(history, previous)
         );
 
-        setUnreadMessages((previous) => ({
-          ...previous,
-          [selectedUserId]: 0,
-        }));
+        
       } catch (error) {
         if (!controller.signal.aborted) {
           setMessageError(error.message);
@@ -532,6 +497,54 @@ function MessagesPage() {
     currentUserId,
     isConnected,
   ]);
+
+
+/* AUTOMATICALLY MARK MESSAGES AS READ */
+
+useEffect(() => {
+  if (
+    !selectedUserId ||
+    !currentUserId ||
+    !mobileChatOpen ||
+    loadingMessages ||
+    messageError
+  ) {
+    return;
+  }
+
+  const markAsRead = () => {
+    if (document.visibilityState !== "visible") {
+      return;
+    }
+
+    if (unreadMessages[selectedUserId] > 0) {
+      markConversationAsRead(selectedUserId);
+    }
+  };
+
+  markAsRead();
+
+  document.addEventListener(
+    "visibilitychange",
+    markAsRead
+  );
+
+  return () => {
+    document.removeEventListener(
+      "visibilitychange",
+      markAsRead
+    );
+  };
+}, [
+  selectedUserId,
+  currentUserId,
+  mobileChatOpen,
+  loadingMessages,
+  messageError,
+  unreadMessages,
+  markConversationAsRead,
+]);
+
 
   /* SCROLL TO LATEST MESSAGE */
 
